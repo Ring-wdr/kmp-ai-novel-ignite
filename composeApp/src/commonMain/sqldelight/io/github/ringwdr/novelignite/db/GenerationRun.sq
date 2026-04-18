@@ -1,0 +1,27 @@
+CREATE TABLE GenerationRun (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER REFERENCES Project(id) ON DELETE SET NULL,
+    template_id INTEGER REFERENCES Template(id) ON DELETE SET NULL,
+    template_version_id INTEGER REFERENCES TemplateVersion(id) ON DELETE SET NULL,
+    action_type TEXT NOT NULL,
+    input_text TEXT NOT NULL,
+    output_text TEXT NOT NULL,
+    created_at_epoch_ms INTEGER NOT NULL
+);
+
+selectGenerationRunsByProjectId:
+SELECT *
+FROM GenerationRun
+WHERE project_id = ?
+ORDER BY created_at_epoch_ms DESC, id DESC;
+
+insertGenerationRun:
+INSERT INTO GenerationRun(
+    project_id,
+    template_id,
+    template_version_id,
+    action_type,
+    input_text,
+    output_text,
+    created_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?);

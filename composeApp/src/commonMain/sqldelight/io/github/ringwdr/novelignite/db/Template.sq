@@ -1,0 +1,46 @@
+CREATE TABLE Template (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    genre TEXT NOT NULL,
+    premise TEXT NOT NULL,
+    world_setting TEXT NOT NULL,
+    character_cards TEXT NOT NULL,
+    relationship_notes TEXT NOT NULL,
+    tone_style TEXT NOT NULL,
+    banned_elements TEXT NOT NULL,
+    plot_constraints TEXT NOT NULL,
+    opening_hook TEXT NOT NULL,
+    prompt_blocks_json TEXT NOT NULL,
+    created_at_epoch_ms INTEGER NOT NULL,
+    updated_at_epoch_ms INTEGER NOT NULL
+);
+
+selectAllTemplates:
+SELECT *
+FROM Template
+ORDER BY updated_at_epoch_ms DESC, id DESC;
+
+selectTemplateById:
+SELECT *
+FROM Template
+WHERE id = ?;
+
+insertTemplate:
+INSERT INTO Template(
+    title,
+    genre,
+    premise,
+    world_setting,
+    character_cards,
+    relationship_notes,
+    tone_style,
+    banned_elements,
+    plot_constraints,
+    opening_hook,
+    prompt_blocks_json,
+    created_at_epoch_ms,
+    updated_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+lastInsertedRowId:
+SELECT last_insert_rowid();
