@@ -39,4 +39,51 @@ class TemplateRepositoryImplTest {
         assertEquals("Rain on neon stone", template.openingHook)
         assertEquals(listOf("Keep sensory detail high"), template.promptBlocks)
     }
+
+    @Test
+    fun saveTemplate_withExistingId_updatesTheSameRow() = runTest {
+        val database = TestDatabaseFactory.create()
+        val repository = TemplateRepositoryImpl(database)
+
+        val created = repository.saveTemplate(
+            title = "Noir Seoul",
+            genre = "Urban Fantasy",
+            premise = "A ghost broker solves debts",
+            worldSetting = "Night markets and hidden contracts",
+            characterCards = "Jin, Hyeon, Broker",
+            relationshipNotes = "Debt binds broker and ghost",
+            toneStyle = "Moody and elegant",
+            bannedElements = "No slapstick",
+            plotConstraints = "Reveal one secret per scene",
+            openingHook = "Rain on neon stone",
+            promptBlocks = listOf("Keep sensory detail high"),
+        )
+
+        val updated = repository.saveTemplate(
+            title = "Noir Seoul Revised",
+            genre = "Urban Fantasy",
+            premise = "A ghost broker negotiates a deeper debt",
+            worldSetting = "Night markets and hidden contracts",
+            characterCards = "Jin, Hyeon, Broker",
+            relationshipNotes = "Debt binds broker and ghost",
+            toneStyle = "Moody and elegant",
+            bannedElements = "No slapstick",
+            plotConstraints = "Reveal one secret per scene",
+            openingHook = "Rain on neon stone",
+            promptBlocks = listOf("Keep sensory detail high", "Keep dialogue sharp"),
+            templateId = created.id,
+        )
+
+        val templates = repository.listTemplates()
+
+        assertEquals(created.id, updated.id)
+        assertEquals(1, templates.size)
+        assertEquals(created.id, templates.first().id)
+        assertEquals("Noir Seoul Revised", templates.first().title)
+        assertEquals("Night markets and hidden contracts", templates.first().worldSetting)
+        assertEquals(
+            listOf("Keep sensory detail high", "Keep dialogue sharp"),
+            templates.first().promptBlocks,
+        )
+    }
 }

@@ -42,5 +42,22 @@ INSERT INTO Template(
     updated_at_epoch_ms
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
+updateTemplate:
+UPDATE Template
+SET
+    title = ?,
+    genre = ?,
+    premise = ?,
+    world_setting = ?,
+    character_cards = ?,
+    relationship_notes = ?,
+    tone_style = ?,
+    banned_elements = ?,
+    plot_constraints = ?,
+    opening_hook = ?,
+    prompt_blocks_json = ?,
+    updated_at_epoch_ms = ?
+WHERE id = ?;
+
 lastInsertedRowId:
 SELECT last_insert_rowid();

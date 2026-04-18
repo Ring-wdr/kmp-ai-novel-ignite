@@ -33,10 +33,17 @@ import kotlinx.coroutines.launch
 fun TemplatesScreen() {
     var templates by remember { mutableStateOf(loadLocalTemplates()) }
     val activeTemplate by ActiveWorkshopTemplateStore.selection.collectAsState()
-    val editorViewModel = remember { TemplateEditorViewModel() }
-    val editorState by editorViewModel.state.collectAsState()
+    val newTemplateEditorViewModel = remember { TemplateEditorViewModel() }
+    val newTemplateEditorState by newTemplateEditorViewModel.state.collectAsState()
+    val detailTemplateEditorViewModel = remember { TemplateEditorViewModel() }
+    val detailTemplateEditorState by detailTemplateEditorViewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
-    var promptBlockInput by remember { mutableStateOf("") }
+    var newPromptBlockInput by remember { mutableStateOf("") }
+    var detailPromptBlockInput by remember { mutableStateOf("") }
+    var selectedTemplateId by remember { mutableStateOf<Long?>(null) }
+    val selectedTemplate = selectedTemplateId?.let { templateId ->
+        templates.firstOrNull { it.id == templateId }
+    }
 
     Column(
         modifier = Modifier.padding(16.dp),
@@ -64,32 +71,84 @@ fun TemplatesScreen() {
             }
         }
 
-        NewTemplateCard(
-            state = editorState,
-            promptBlockInput = promptBlockInput,
-            onTitleChange = editorViewModel::updateTitle,
-            onGenreChange = editorViewModel::updateGenre,
-            onPremiseChange = editorViewModel::updatePremise,
-            onPromptBlockInputChange = { promptBlockInput = it },
+        TemplateEditorCard(
+            title = "New Template",
+            saveLabel = "Save and Use in Workshop",
+            state = newTemplateEditorState,
+            promptBlockInput = newPromptBlockInput,
+            onTitleChange = newTemplateEditorViewModel::updateTitle,
+            onGenreChange = newTemplateEditorViewModel::updateGenre,
+            onPremiseChange = newTemplateEditorViewModel::updatePremise,
+            onPromptBlockInputChange = { newPromptBlockInput = it },
             onAddPromptBlock = {
-                editorViewModel.addPromptBlock(promptBlockInput)
-                promptBlockInput = ""
+                newTemplateEditorViewModel.addPromptBlock(newPromptBlockInput)
+                newPromptBlockInput = ""
             },
+            onPromptBlockChange = newTemplateEditorViewModel::updatePromptBlock,
+            onRemovePromptBlock = newTemplateEditorViewModel::removePromptBlock,
             onSaveTemplate = {
                 scope.launch {
-                    editorViewModel.saveTemplate { draft ->
-                        val savedTemplate = saveLocalTemplate(draft)
-                        templates = loadLocalTemplates()
-                        ActiveWorkshopTemplateStore.select(
-                            ActiveWorkshopTemplate(
-                                id = savedTemplate.id,
-                                title = savedTemplate.title,
-                            )
+                    val savedTemplate = newTemplateEditorViewModel.saveTemplate(
+                        onSave = { draft ->
+                            saveLocalTemplate(draft = draft)
+                        },
+                    )
+                    templates = loadLocalTemplates()
+                    ActiveWorkshopTemplateStore.select(
+                        ActiveWorkshopTemplate(
+                            id = savedTemplate.id,
+                            title = savedTemplate.title,
                         )
-                    }
+                    )
                 }
             },
         )
+
+        if (selectedTemplate != null) {
+            TemplateEditorCard(
+                title = "Template Details",
+                saveLabel = "Save Changes",
+                state = detailTemplateEditorState,
+                promptBlockInput = detailPromptBlockInput,
+                onTitleChange = detailTemplateEditorViewModel::updateTitle,
+                onGenreChange = detailTemplateEditorViewModel::updateGenre,
+            onPremiseChange = detailTemplateEditorViewModel::updatePremise,
+            onPromptBlockInputChange = { detailPromptBlockInput = it },
+            onAddPromptBlock = {
+                detailTemplateEditorViewModel.addPromptBlock(detailPromptBlockInput)
+                detailPromptBlockInput = ""
+            },
+            onPromptBlockChange = detailTemplateEditorViewModel::updatePromptBlock,
+            onRemovePromptBlock = detailTemplateEditorViewModel::removePromptBlock,
+            onSaveTemplate = {
+                scope.launch {
+                    val templateId = selectedTemplateId ?: return@launch
+                    val savedTemplate = detailTemplateEditorViewModel.saveTemplate(
+                        onSave = { draft ->
+                                saveLocalTemplate(
+                                    draft = draft,
+                                    templateId = templateId,
+                                    originalTemplate = selectedTemplate,
+                                )
+                        },
+                        resetAfterSave = false,
+                    )
+                        templates = loadLocalTemplates()
+                        selectedTemplateId = savedTemplate.id
+                        detailTemplateEditorViewModel.loadTemplate(savedTemplate)
+                        detailPromptBlockInput = ""
+                        if (activeTemplate?.id == savedTemplate.id) {
+                            ActiveWorkshopTemplateStore.select(
+                                ActiveWorkshopTemplate(
+                                    id = savedTemplate.id,
+                                    title = savedTemplate.title,
+                                )
+                            )
+                        }
+                    }
+                },
+            )
+        }
 
         if (templates.isEmpty()) {
             Text("No local templates yet. Create one below, then bind it to Workshop.")
@@ -99,6 +158,12 @@ fun TemplatesScreen() {
                     TemplateListItem(
                         template = template,
                         isActive = activeTemplate?.id == template.id,
+                        isSelected = selectedTemplate?.id == template.id,
+                        onOpenTemplate = {
+                            selectedTemplateId = template.id
+                            detailTemplateEditorViewModel.loadTemplate(template)
+                            detailPromptBlockInput = ""
+                        },
                     )
                 }
             }
@@ -107,7 +172,9 @@ fun TemplatesScreen() {
 }
 
 @Composable
-private fun NewTemplateCard(
+private fun TemplateEditorCard(
+    title: String,
+    saveLabel: String,
     state: TemplateEditorState,
     promptBlockInput: String,
     onTitleChange: (String) -> Unit,
@@ -115,6 +182,8 @@ private fun NewTemplateCard(
     onPremiseChange: (String) -> Unit,
     onPromptBlockInputChange: (String) -> Unit,
     onAddPromptBlock: () -> Unit,
+    onPromptBlockChange: (Int, String) -> Unit,
+    onRemovePromptBlock: (Int) -> Unit,
     onSaveTemplate: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -123,7 +192,7 @@ private fun NewTemplateCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "New Template",
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -162,8 +231,21 @@ private fun NewTemplateCard(
             }
             if (state.promptBlocks.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    state.promptBlocks.forEach { block ->
-                        Text("- $block")
+                    state.promptBlocks.forEachIndexed { index, block ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedTextField(
+                                value = block,
+                                onValueChange = { onPromptBlockChange(index, it) },
+                                label = { Text("Prompt block ${index + 1}") },
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedButton(onClick = { onRemovePromptBlock(index) }) {
+                                Text("Remove")
+                            }
+                        }
                     }
                 }
             }
@@ -172,9 +254,10 @@ private fun NewTemplateCard(
                 enabled = state.title.isNotBlank() &&
                     state.genre.isNotBlank() &&
                     state.premise.isNotBlank() &&
-                    state.promptBlocks.isNotEmpty(),
+                    state.promptBlocks.isNotEmpty() &&
+                    state.promptBlocks.all { it.trim().isNotBlank() },
             ) {
-                Text("Save and Use in Workshop")
+                Text(saveLabel)
             }
         }
     }
@@ -184,15 +267,13 @@ private fun NewTemplateCard(
 private fun TemplateListItem(
     template: Template,
     isActive: Boolean,
+    isSelected: Boolean,
+    onOpenTemplate: () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                ActiveWorkshopTemplateStore.select(
-                    ActiveWorkshopTemplate(id = template.id, title = template.title)
-                )
-            },
+            .clickable(onClick = onOpenTemplate),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -211,6 +292,13 @@ private fun TemplateListItem(
                 text = template.premise.ifBlank { "No premise yet." },
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (isSelected) {
+                Text(
+                    text = "Editing this template",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             Button(
                 onClick = {
                     ActiveWorkshopTemplateStore.select(

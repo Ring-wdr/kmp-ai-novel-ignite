@@ -4,4 +4,8 @@ import io.github.ringwdr.novelignite.domain.model.Template
 
 expect fun loadLocalTemplates(): List<Template>
 
-expect suspend fun saveLocalTemplate(draft: TemplateDraft): Template
+expect suspend fun saveLocalTemplate(
+    draft: TemplateDraft,
+    templateId: Long? = null,
+    originalTemplate: Template? = null,
+): Template

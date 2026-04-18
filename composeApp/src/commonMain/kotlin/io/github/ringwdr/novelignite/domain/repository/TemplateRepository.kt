@@ -15,6 +15,7 @@ interface TemplateRepository {
         plotConstraints: String,
         openingHook: String,
         promptBlocks: List<String>,
+        templateId: Long? = null,
     ): Template
 
     fun listTemplates(): List<Template>

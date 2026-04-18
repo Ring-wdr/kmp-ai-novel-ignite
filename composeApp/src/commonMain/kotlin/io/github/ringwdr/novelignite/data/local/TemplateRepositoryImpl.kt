@@ -25,9 +25,83 @@ class TemplateRepositoryImpl(
         plotConstraints: String,
         openingHook: String,
         promptBlocks: List<String>,
+        templateId: Long?,
     ): Template = withContext(Dispatchers.IO) {
         val now = Clock.System.now().toEpochMilliseconds()
+        val encodedPromptBlocks = json.encodeToString(promptBlocks)
 
+        val persistedTemplateId = if (templateId == null) {
+            insertTemplate(
+                title = title,
+                genre = genre,
+                premise = premise,
+                worldSetting = worldSetting,
+                characterCards = characterCards,
+                relationshipNotes = relationshipNotes,
+                toneStyle = toneStyle,
+                bannedElements = bannedElements,
+                plotConstraints = plotConstraints,
+                openingHook = openingHook,
+                encodedPromptBlocks = encodedPromptBlocks,
+                now = now,
+            )
+        } else {
+            database.templateQueries.updateTemplate(
+                id = templateId,
+                title = title,
+                genre = genre,
+                premise = premise,
+                world_setting = worldSetting,
+                character_cards = characterCards,
+                relationship_notes = relationshipNotes,
+                tone_style = toneStyle,
+                banned_elements = bannedElements,
+                plot_constraints = plotConstraints,
+                opening_hook = openingHook,
+                prompt_blocks_json = encodedPromptBlocks,
+                updated_at_epoch_ms = now,
+            )
+
+            database.templateQueries.selectTemplateById(templateId).executeAsOneOrNull()?.id
+                ?: insertTemplate(
+                    title = title,
+                    genre = genre,
+                    premise = premise,
+                    worldSetting = worldSetting,
+                    characterCards = characterCards,
+                    relationshipNotes = relationshipNotes,
+                    toneStyle = toneStyle,
+                    bannedElements = bannedElements,
+                    plotConstraints = plotConstraints,
+                    openingHook = openingHook,
+                    encodedPromptBlocks = encodedPromptBlocks,
+                    now = now,
+                )
+        }
+
+        database.templateQueries.selectTemplateById(persistedTemplateId)
+            .executeAsOne()
+            .toDomainModel(json)
+    }
+
+    override fun listTemplates(): List<Template> = database.templateQueries.selectAllTemplates()
+        .executeAsList()
+        .map { it.toDomainModel(json) }
+
+    private fun insertTemplate(
+        title: String,
+        genre: String,
+        premise: String,
+        worldSetting: String,
+        characterCards: String,
+        relationshipNotes: String,
+        toneStyle: String,
+        bannedElements: String,
+        plotConstraints: String,
+        openingHook: String,
+        encodedPromptBlocks: String,
+        now: Long,
+    ): Long {
         database.templateQueries.insertTemplate(
             title = title,
             genre = genre,
@@ -39,21 +113,13 @@ class TemplateRepositoryImpl(
             banned_elements = bannedElements,
             plot_constraints = plotConstraints,
             opening_hook = openingHook,
-            prompt_blocks_json = json.encodeToString(promptBlocks),
+            prompt_blocks_json = encodedPromptBlocks,
             created_at_epoch_ms = now,
             updated_at_epoch_ms = now,
         )
 
-        val templateId = database.templateQueries.lastInsertedRowId().executeAsOne()
-
-        database.templateQueries.selectTemplateById(templateId)
-            .executeAsOne()
-            .toDomainModel(json)
+        return database.templateQueries.lastInsertedRowId().executeAsOne()
     }
-
-    override fun listTemplates(): List<Template> = database.templateQueries.selectAllTemplates()
-        .executeAsList()
-        .map { it.toDomainModel(json) }
 }
 
 private fun io.github.ringwdr.novelignite.db.Template.toDomainModel(json: Json): Template = Template(

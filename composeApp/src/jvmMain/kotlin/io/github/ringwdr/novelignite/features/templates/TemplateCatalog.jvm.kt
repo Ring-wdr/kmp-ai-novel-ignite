@@ -8,18 +8,31 @@ actual fun loadLocalTemplates(): List<Template> = TemplateRepositoryImpl(
     database = openDesktopDatabase(),
 ).listTemplates()
 
-actual suspend fun saveLocalTemplate(draft: TemplateDraft): Template = TemplateRepositoryImpl(
+actual suspend fun saveLocalTemplate(
+    draft: TemplateDraft,
+    templateId: Long?,
+    originalTemplate: Template?,
+): Template = TemplateRepositoryImpl(
     database = openDesktopDatabase(),
-).saveTemplate(
-    title = draft.title,
-    genre = draft.genre,
-    premise = draft.premise,
-    worldSetting = "",
-    characterCards = "",
-    relationshipNotes = "",
-    toneStyle = "",
-    bannedElements = "",
-    plotConstraints = "",
-    openingHook = "",
-    promptBlocks = draft.promptBlocks,
-)
+).let { repository ->
+    val preservedTemplate = when {
+        originalTemplate != null -> originalTemplate
+        templateId != null -> repository.listTemplates().firstOrNull { it.id == templateId }
+        else -> null
+    }
+
+    repository.saveTemplate(
+        title = draft.title,
+        genre = draft.genre,
+        premise = draft.premise,
+        worldSetting = preservedTemplate?.worldSetting.orEmpty(),
+        characterCards = preservedTemplate?.characterCards.orEmpty(),
+        relationshipNotes = preservedTemplate?.relationshipNotes.orEmpty(),
+        toneStyle = preservedTemplate?.toneStyle.orEmpty(),
+        bannedElements = preservedTemplate?.bannedElements.orEmpty(),
+        plotConstraints = preservedTemplate?.plotConstraints.orEmpty(),
+        openingHook = preservedTemplate?.openingHook.orEmpty(),
+        promptBlocks = draft.promptBlocks,
+        templateId = if (preservedTemplate != null || templateId == null) templateId else null,
+    )
+}

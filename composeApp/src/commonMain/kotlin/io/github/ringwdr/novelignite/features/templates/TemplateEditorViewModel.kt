@@ -1,5 +1,6 @@
 package io.github.ringwdr.novelignite.features.templates
 
+import io.github.ringwdr.novelignite.domain.model.Template
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -12,6 +13,15 @@ data class TemplateDraft(
 
 class TemplateEditorViewModel {
     val state = MutableStateFlow(TemplateEditorState())
+
+    fun loadTemplate(template: Template) {
+        state.value = TemplateEditorState(
+            title = template.title,
+            genre = template.genre,
+            premise = template.premise,
+            promptBlocks = template.promptBlocks,
+        )
+    }
 
     fun updateTitle(value: String) {
         state.update { it.copy(title = value) }
@@ -31,16 +41,47 @@ class TemplateEditorViewModel {
         state.update { it.copy(promptBlocks = it.promptBlocks + sanitized) }
     }
 
-    suspend fun saveTemplate(onSave: suspend (TemplateDraft) -> Unit) {
+    fun updatePromptBlock(index: Int, value: String) {
+        state.update { current ->
+            if (index !in current.promptBlocks.indices) return@update current
+            val updatedBlocks = current.promptBlocks.toMutableList()
+            updatedBlocks[index] = value
+            current.copy(promptBlocks = updatedBlocks)
+        }
+    }
+
+    fun removePromptBlock(index: Int) {
+        state.update { current ->
+            if (index !in current.promptBlocks.indices) return@update current
+            current.copy(
+                promptBlocks = current.promptBlocks.filterIndexed { currentIndex, _ ->
+                    currentIndex != index
+                }
+            )
+        }
+    }
+
+    suspend fun saveTemplate(
+        onSave: suspend (TemplateDraft) -> Template,
+        resetAfterSave: Boolean = true,
+    ): Template {
         val snapshot = state.value
-        onSave(
+        val normalizedPromptBlocks = snapshot.promptBlocks
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        val savedTemplate = onSave(
             TemplateDraft(
                 title = snapshot.title.trim(),
                 genre = snapshot.genre.trim(),
                 premise = snapshot.premise.trim(),
-                promptBlocks = snapshot.promptBlocks,
+                promptBlocks = normalizedPromptBlocks,
             )
         )
-        state.value = TemplateEditorState()
+        if (resetAfterSave) {
+            state.value = TemplateEditorState()
+        } else {
+            loadTemplate(savedTemplate)
+        }
+        return savedTemplate
     }
 }
