@@ -5,7 +5,7 @@ This repository must start from the official Kotlin Multiplatform wizard output.
 ## Scaffold Verification
 
 - Verified generated desktop app launch command: `.\gradlew.bat :composeApp:run`
-- Environment caveat: this machine must use JDK 21 for that command because the default JDK 25 fails Gradle Kotlin DSL parsing before project configuration
+- Environment note: the project now encodes a Java 21 Gradle daemon/toolchain expectation because this machine's default JDK 25 previously failed Gradle Kotlin DSL parsing before project configuration
 
 Kotlin Multiplatform 기반의 AI 소설 작성 앱 프로젝트입니다.
 
