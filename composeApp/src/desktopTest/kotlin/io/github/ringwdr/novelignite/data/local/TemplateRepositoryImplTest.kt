@@ -25,7 +25,18 @@ class TemplateRepositoryImplTest {
         )
 
         val templates = repository.listTemplates()
-        assertEquals("Noir Seoul", templates.first().title)
-        assertEquals(1, templates.first().promptBlocks.size)
+        val template = templates.first()
+
+        assertEquals("Noir Seoul", template.title)
+        assertEquals("Urban Fantasy", template.genre)
+        assertEquals("A ghost broker solves debts", template.premise)
+        assertEquals("Night markets and hidden contracts", template.worldSetting)
+        assertEquals("Jin, Hyeon, Broker", template.characterCards)
+        assertEquals("Debt binds broker and ghost", template.relationshipNotes)
+        assertEquals("Moody and elegant", template.toneStyle)
+        assertEquals("No slapstick", template.bannedElements)
+        assertEquals("Reveal one secret per scene", template.plotConstraints)
+        assertEquals("Rain on neon stone", template.openingHook)
+        assertEquals(listOf("Keep sensory detail high"), template.promptBlocks)
     }
 }
