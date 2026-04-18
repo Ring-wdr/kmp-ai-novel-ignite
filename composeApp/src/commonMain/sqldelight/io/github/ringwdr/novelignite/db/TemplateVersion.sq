@@ -13,7 +13,8 @@ CREATE TABLE TemplateVersion (
     plot_constraints TEXT NOT NULL,
     opening_hook TEXT NOT NULL,
     prompt_blocks_json TEXT NOT NULL,
-    created_at_epoch_ms INTEGER NOT NULL
+    created_at_epoch_ms INTEGER NOT NULL,
+    UNIQUE(template_id, version_number)
 );
 
 selectTemplateVersionsByTemplateId:
