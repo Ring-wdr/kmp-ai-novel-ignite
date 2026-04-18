@@ -12,6 +12,18 @@ FROM DraftSession
 WHERE project_id = ?
 ORDER BY updated_at_epoch_ms DESC, id DESC;
 
+selectLatestDraftSessionByProjectId:
+SELECT *
+FROM DraftSession
+WHERE project_id = ?
+ORDER BY updated_at_epoch_ms DESC, id DESC
+LIMIT 1;
+
+selectDraftSessionById:
+SELECT *
+FROM DraftSession
+WHERE id = ?;
+
 insertDraftSession:
 INSERT INTO DraftSession(
     project_id,
@@ -19,3 +31,12 @@ INSERT INTO DraftSession(
     created_at_epoch_ms,
     updated_at_epoch_ms
 ) VALUES (?, ?, ?, ?);
+
+updateDraftSessionContentById:
+UPDATE DraftSession
+SET content = ?,
+    updated_at_epoch_ms = ?
+WHERE id = ?;
+
+lastInsertedDraftSessionRowId:
+SELECT last_insert_rowid();

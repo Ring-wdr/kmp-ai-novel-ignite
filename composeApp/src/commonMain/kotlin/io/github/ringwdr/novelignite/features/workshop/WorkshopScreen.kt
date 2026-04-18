@@ -51,5 +51,5 @@ fun WorkshopScreen(
 private fun rememberWorkshopViewModel(): WorkshopViewModel = remember {
     val inferenceEngine = runCatching { getKoin().get<InferenceEngine>() }
         .getOrElse { FakeInferenceEngine() }
-    WorkshopViewModel(inferenceEngine)
+    createDefaultWorkshopViewModel(inferenceEngine)
 }

@@ -18,9 +18,11 @@ import kotlinx.coroutines.launch
 
 class WorkshopViewModel(
     private val inferenceEngine: InferenceEngine,
+    initialState: WorkshopUiState = WorkshopUiState(),
+    private val persistState: suspend (WorkshopUiState) -> Unit = {},
     private val scope: CoroutineScope = defaultWorkshopScope(),
 ) {
-    private val _state = MutableStateFlow(WorkshopUiState())
+    private val _state = MutableStateFlow(initialState)
     private var nextGenerationId = 0
     private var activeGenerationId = 0
     private var activeGenerationJob: Job? = null
@@ -28,6 +30,7 @@ class WorkshopViewModel(
 
     fun updateDraft(text: String) {
         _state.update { it.copy(draftText = text) }
+        persistCurrentState()
     }
 
     fun continueScene() {
@@ -59,6 +62,7 @@ class WorkshopViewModel(
                         else -> Unit
                     }
                 }
+                persistCurrentState()
             } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
             } finally {
@@ -73,6 +77,13 @@ class WorkshopViewModel(
 
     fun clear() {
         scope.cancel()
+    }
+
+    private fun persistCurrentState() {
+        val snapshot = _state.value
+        scope.launch {
+            persistState(snapshot)
+        }
     }
 }
 
