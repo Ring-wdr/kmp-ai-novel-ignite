@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,9 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.ringwdr.novelignite.domain.model.Template
+import io.github.ringwdr.novelignite.domain.model.TemplateVersion
 import io.github.ringwdr.novelignite.features.workshop.ActiveWorkshopTemplate
 import io.github.ringwdr.novelignite.features.workshop.ActiveWorkshopTemplateStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun TemplatesScreen() {
@@ -44,7 +48,16 @@ fun TemplatesScreen() {
     val selectedTemplate = selectedTemplateId?.let { templateId ->
         templates.firstOrNull { it.id == templateId }
     }
-    val selectedTemplateVersions = selectedTemplate?.let { loadLocalTemplateVersions(it.id) }.orEmpty()
+    var selectedTemplateVersions by remember { mutableStateOf<List<TemplateVersion>>(emptyList()) }
+    val selectedTemplateVersionKey = selectedTemplate?.let { it.id to it.updatedAtEpochMs }
+
+    LaunchedEffect(selectedTemplateVersionKey) {
+        selectedTemplateVersions = selectedTemplate?.let { template ->
+            withContext(Dispatchers.Default) {
+                loadLocalTemplateVersions(template.id)
+            }
+        }.orEmpty()
+    }
 
     Column(
         modifier = Modifier.padding(16.dp),
@@ -113,27 +126,27 @@ fun TemplatesScreen() {
                 promptBlockInput = detailPromptBlockInput,
                 onTitleChange = detailTemplateEditorViewModel::updateTitle,
                 onGenreChange = detailTemplateEditorViewModel::updateGenre,
-            onPremiseChange = detailTemplateEditorViewModel::updatePremise,
-            onPromptBlockInputChange = { detailPromptBlockInput = it },
-            onAddPromptBlock = {
-                detailTemplateEditorViewModel.addPromptBlock(detailPromptBlockInput)
-                detailPromptBlockInput = ""
-            },
-            onPromptBlockChange = detailTemplateEditorViewModel::updatePromptBlock,
-            onRemovePromptBlock = detailTemplateEditorViewModel::removePromptBlock,
-            onSaveTemplate = {
-                scope.launch {
-                    val templateId = selectedTemplateId ?: return@launch
-                    val savedTemplate = detailTemplateEditorViewModel.saveTemplate(
-                        onSave = { draft ->
+                onPremiseChange = detailTemplateEditorViewModel::updatePremise,
+                onPromptBlockInputChange = { detailPromptBlockInput = it },
+                onAddPromptBlock = {
+                    detailTemplateEditorViewModel.addPromptBlock(detailPromptBlockInput)
+                    detailPromptBlockInput = ""
+                },
+                onPromptBlockChange = detailTemplateEditorViewModel::updatePromptBlock,
+                onRemovePromptBlock = detailTemplateEditorViewModel::removePromptBlock,
+                onSaveTemplate = {
+                    scope.launch {
+                        val templateId = selectedTemplateId ?: return@launch
+                        val savedTemplate = detailTemplateEditorViewModel.saveTemplate(
+                            onSave = { draft ->
                                 saveLocalTemplate(
                                     draft = draft,
                                     templateId = templateId,
                                     originalTemplate = selectedTemplate,
                                 )
-                        },
-                        resetAfterSave = false,
-                    )
+                            },
+                            resetAfterSave = false,
+                        )
                         templates = loadLocalTemplates()
                         selectedTemplateId = savedTemplate.id
                         detailTemplateEditorViewModel.loadTemplate(savedTemplate)

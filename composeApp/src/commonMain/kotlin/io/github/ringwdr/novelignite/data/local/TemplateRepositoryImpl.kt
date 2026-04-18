@@ -84,10 +84,9 @@ class TemplateRepositoryImpl(
                     }
             }
 
-            val nextVersionNumber = (database.templateVersionQueries
-                .selectTemplateVersionsByTemplateId(savedTemplate.id)
-                .executeAsList()
-                .maxOfOrNull { it.version_number } ?: 0L) + 1L
+            val nextVersionNumber = database.templateVersionQueries
+                .selectMaxTemplateVersionNumberByTemplateId(savedTemplate.id)
+                .executeAsOne() + 1L
 
             database.templateVersionQueries.insertTemplateVersion(
                 template_id = savedTemplate.id,
