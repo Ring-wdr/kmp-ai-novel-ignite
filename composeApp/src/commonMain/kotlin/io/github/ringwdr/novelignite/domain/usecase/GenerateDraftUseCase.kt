@@ -11,10 +11,6 @@ class GenerateDraftUseCase(
 ) {
     operator fun invoke(request: GenerationRequest): Flow<GenerationEvent.Final> =
         inferenceEngine.streamGenerate(request).transform { event ->
-            when (event) {
-                is GenerationEvent.Final -> emit(event)
-                is GenerationEvent.Error -> throw IllegalStateException(event.message)
-                is GenerationEvent.Token -> Unit
-            }
+            if (event is GenerationEvent.Final) emit(event)
         }
 }
