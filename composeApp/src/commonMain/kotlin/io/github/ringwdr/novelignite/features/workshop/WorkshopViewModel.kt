@@ -39,7 +39,7 @@ class WorkshopViewModel(
             try {
                 inferenceEngine.streamGenerate(
                     GenerationRequest(
-                        projectId = "local-project",
+                        projectId = "workshop-project",
                         templateId = "workshop-default-template",
                         actionType = "continue",
                         manuscriptExcerpt = _state.value.draftText,

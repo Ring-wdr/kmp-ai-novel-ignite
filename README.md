@@ -33,6 +33,22 @@ Kotlin Multiplatform 기반의 AI 소설 작성 앱 프로젝트입니다.
 현재 제품 설계 스펙은 아래 문서에 정리되어 있습니다.
 
 - [KMP AI Novel App Design](docs/superpowers/specs/2026-04-18-kmp-ai-novel-app-design.md)
+- [Local Development](docs/setup/local-development.md)
+
+## Local Development Snapshot
+
+- 앱 작업은 공식 Kotlin Multiplatform wizard scaffold를 기준으로 이어갑니다.
+- 초기 검증은 Desktop 흐름을 우선 사용합니다.
+- 로컬 추론을 확인할 때는 Ollama를 먼저 실행해 둡니다.
+- Cloud relay 검증이 필요하면 `OPENROUTER_API_KEY`를 설정한 뒤 `./gradlew.bat :relay:run`을 실행합니다.
+
+## Verification
+
+- `./gradlew.bat :composeApp:allTests`
+- `./gradlew.bat :composeApp:desktopTest`
+- `./gradlew.bat :relay:test`
+
+현재 wizard scaffold는 `composeApp/src/desktopTest/kotlin`을 Gradle의 `jvmTest`에 연결합니다. 따라서 이 브랜치에서 Desktop smoke test를 실제로 실행할 때는 `./gradlew.bat :composeApp:jvmTest --tests "io.github.ringwdr.novelignite.smoke.AppSmokeTest"` 또는 `./gradlew.bat :composeApp:jvmTest`를 사용합니다.
 
 ## 구현 원칙
 

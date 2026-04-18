@@ -23,6 +23,26 @@ import kotlinx.coroutines.test.runCurrent
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkshopViewModelTest {
     @Test
+    fun continueScene_usesWizardNeutralProjectIdForGenerationRequests() = runTest {
+        var capturedRequest: GenerationRequest? = null
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val viewModel = WorkshopViewModel(
+            object : InferenceEngine {
+                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
+                    capturedRequest = request
+                    emit(GenerationEvent.Final("ok"))
+                }
+            },
+            scope,
+        )
+
+        viewModel.continueScene()
+        runCurrent()
+
+        assertEquals("workshop-project", capturedRequest?.projectId)
+    }
+
+    @Test
     fun continueScene_appendsGeneratedTextToDraft() = runTest {
         val viewModel = WorkshopViewModel(FakeInferenceEngine())
 
