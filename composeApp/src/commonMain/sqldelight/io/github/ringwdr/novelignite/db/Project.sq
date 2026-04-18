@@ -1,0 +1,20 @@
+CREATE TABLE Project (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    template_id INTEGER,
+    created_at_epoch_ms INTEGER NOT NULL,
+    updated_at_epoch_ms INTEGER NOT NULL
+);
+
+selectAllProjects:
+SELECT *
+FROM Project
+ORDER BY updated_at_epoch_ms DESC, id DESC;
+
+insertProject:
+INSERT INTO Project(
+    title,
+    template_id,
+    created_at_epoch_ms,
+    updated_at_epoch_ms
+) VALUES (?, ?, ?, ?);

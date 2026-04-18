@@ -1,0 +1,21 @@
+CREATE TABLE DraftSession (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES Project(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at_epoch_ms INTEGER NOT NULL,
+    updated_at_epoch_ms INTEGER NOT NULL
+);
+
+selectDraftSessionsByProjectId:
+SELECT *
+FROM DraftSession
+WHERE project_id = ?
+ORDER BY updated_at_epoch_ms DESC, id DESC;
+
+insertDraftSession:
+INSERT INTO DraftSession(
+    project_id,
+    content,
+    created_at_epoch_ms,
+    updated_at_epoch_ms
+) VALUES (?, ?, ?, ?);

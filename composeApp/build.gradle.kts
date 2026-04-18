@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    id("app.cash.sqldelight") version "2.2.1"
 }
 
 kotlin {
@@ -20,6 +21,10 @@ kotlin {
     }
     
     jvm()
+
+    sourceSets.named("jvmTest") {
+        kotlin.srcDir("src/desktopTest/kotlin")
+    }
     
     sourceSets {
         androidMain.dependencies {
@@ -37,6 +42,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.koin.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -45,6 +52,11 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+        }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.testJunit)
+            implementation("app.cash.sqldelight:sqlite-driver:2.2.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
     }
 }
@@ -78,6 +90,14 @@ android {
 
 dependencies {
     debugImplementation(libs.compose.uiTooling)
+}
+
+sqldelight {
+    databases {
+        create("NovelIgniteDatabase") {
+            packageName.set("io.github.ringwdr.novelignite.db")
+        }
+    }
 }
 
 compose.desktop {
