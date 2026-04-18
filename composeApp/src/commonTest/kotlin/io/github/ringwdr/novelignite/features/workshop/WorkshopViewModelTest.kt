@@ -33,7 +33,7 @@ class WorkshopViewModelTest {
                     emit(GenerationEvent.Final("ok"))
                 }
             },
-            scope,
+            scope = scope,
         )
 
         viewModel.continueScene()
@@ -64,7 +64,7 @@ class WorkshopViewModelTest {
                     emit(GenerationEvent.Error("boom"))
                 }
             },
-            scope,
+            scope = scope,
         )
 
         viewModel.updateDraft("The gate opened.")
@@ -91,7 +91,7 @@ class WorkshopViewModelTest {
                     }
                 }
             },
-            scope,
+            scope = scope,
         )
 
         viewModel.updateDraft("The gate opened.")
@@ -114,7 +114,7 @@ class WorkshopViewModelTest {
                     throw IllegalStateException("boom")
                 }
             },
-            scope,
+            scope = scope,
         )
 
         viewModel.updateDraft("The gate opened.")
@@ -127,7 +127,7 @@ class WorkshopViewModelTest {
     @Test
     fun clear_cancelsWorkshopScope() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val viewModel = WorkshopViewModel(FakeInferenceEngine(), scope)
+        val viewModel = WorkshopViewModel(FakeInferenceEngine(), scope = scope)
 
         viewModel.clear()
 
@@ -148,7 +148,7 @@ class WorkshopViewModelTest {
                     emit(GenerationEvent.Final("one"))
                 }
             },
-            scope,
+            scope = scope,
         )
 
         viewModel.updateDraft("The gate opened.")

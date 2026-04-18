@@ -7,3 +7,19 @@ import io.github.ringwdr.novelignite.domain.model.Template
 actual fun loadLocalTemplates(): List<Template> = TemplateRepositoryImpl(
     database = openDesktopDatabase(),
 ).listTemplates()
+
+actual suspend fun saveLocalTemplate(draft: TemplateDraft): Template = TemplateRepositoryImpl(
+    database = openDesktopDatabase(),
+).saveTemplate(
+    title = draft.title,
+    genre = draft.genre,
+    premise = draft.premise,
+    worldSetting = "",
+    characterCards = "",
+    relationshipNotes = "",
+    toneStyle = "",
+    bannedElements = "",
+    plotConstraints = "",
+    openingHook = "",
+    promptBlocks = draft.promptBlocks,
+)
