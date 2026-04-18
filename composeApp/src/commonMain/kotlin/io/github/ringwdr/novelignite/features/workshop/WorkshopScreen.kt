@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -17,6 +18,10 @@ fun WorkshopScreen(
     viewModel: WorkshopViewModel = rememberWorkshopViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.clear() }
+    }
 
     Column(
         modifier = Modifier
