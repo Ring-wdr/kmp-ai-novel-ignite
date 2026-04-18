@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
@@ -20,6 +21,7 @@ class WorkshopViewModel(
     private val scope: CoroutineScope = defaultWorkshopScope(),
 ) {
     private val _state = MutableStateFlow(WorkshopUiState())
+    private var activeGenerationJob: Job? = null
     val state: StateFlow<WorkshopUiState> = _state
 
     fun updateDraft(text: String) {
@@ -27,8 +29,9 @@ class WorkshopViewModel(
     }
 
     fun continueScene() {
+        if (activeGenerationJob?.isActive == true) return
         _state.update { it.copy(isGenerating = true) }
-        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+        activeGenerationJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 inferenceEngine.streamGenerate(
                     GenerationRequest(
@@ -53,6 +56,7 @@ class WorkshopViewModel(
                 if (throwable is CancellationException) throw throwable
             } finally {
                 _state.update { it.copy(isGenerating = false) }
+                activeGenerationJob = null
             }
         }
     }

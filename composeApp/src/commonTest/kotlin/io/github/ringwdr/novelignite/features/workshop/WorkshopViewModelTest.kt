@@ -15,7 +15,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class WorkshopViewModelTest {
     @Test
     fun continueScene_appendsGeneratedTextToDraft() = runTest {
@@ -32,32 +37,38 @@ class WorkshopViewModelTest {
 
     @Test
     fun continueScene_clearsGeneratingWhenEngineSignalsError() = runTest {
+        val scope = backgroundScope
         val viewModel = WorkshopViewModel(
             object : InferenceEngine {
                 override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
                     emit(GenerationEvent.Error("boom"))
                 }
-            }
+            },
+            scope,
         )
 
         viewModel.updateDraft("The gate opened.")
         viewModel.continueScene()
+        runCurrent()
 
         assertFalse(viewModel.state.value.isGenerating)
     }
 
     @Test
     fun continueScene_clearsGeneratingWhenEngineThrows() = runTest {
+        val scope = backgroundScope
         val viewModel = WorkshopViewModel(
             object : InferenceEngine {
                 override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
                     throw IllegalStateException("boom")
                 }
-            }
+            },
+            scope,
         )
 
         viewModel.updateDraft("The gate opened.")
         viewModel.continueScene()
+        runCurrent()
 
         assertFalse(viewModel.state.value.isGenerating)
     }
@@ -70,5 +81,38 @@ class WorkshopViewModelTest {
         viewModel.clear()
 
         assertTrue(scope.coroutineContext[Job]!!.isCancelled)
+    }
+
+    @Test
+    fun continueScene_ignoresSecondCallWhileGenerationIsActive() = runTest {
+        val release = Channel<Unit>()
+        val requestCount = mutableListOf<GenerationRequest>()
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val viewModel = WorkshopViewModel(
+            object : InferenceEngine {
+                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
+                    requestCount += request
+                    emit(GenerationEvent.Token("one"))
+                    release.receive()
+                    emit(GenerationEvent.Final("one"))
+                }
+            },
+            scope,
+        )
+
+        viewModel.updateDraft("The gate opened.")
+        viewModel.continueScene()
+        viewModel.continueScene()
+        runCurrent()
+
+        assertEquals(1, requestCount.size)
+        assertTrue(viewModel.state.value.isGenerating)
+        assertEquals("", viewModel.state.value.generatedText)
+
+        release.trySend(Unit)
+        runCurrent()
+
+        assertEquals("one", viewModel.state.value.generatedText)
+        assertFalse(viewModel.state.value.isGenerating)
     }
 }
