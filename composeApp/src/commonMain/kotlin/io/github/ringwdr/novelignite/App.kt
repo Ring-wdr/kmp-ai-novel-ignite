@@ -1,49 +1,54 @@
 package io.github.ringwdr.novelignite
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
-import kmp_ai_novel_ignite.composeapp.generated.resources.Res
-import kmp_ai_novel_ignite.composeapp.generated.resources.compose_multiplatform
+import io.github.ringwdr.novelignite.navigation.AppDestination
+import io.github.ringwdr.novelignite.navigation.AppNavHost
 
 @Composable
 @Preview
 fun App() {
     MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
+        val bootstrap = remember { createAppBootstrap() }
+        var currentDestination by remember {
+            mutableStateOf(AppDestination.fromRoute(bootstrap.topLevelDestinations.first().route))
+        }
+
         Column(
             modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
                 .safeContentPadding()
                 .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+            PrimaryTabRow(
+                selectedTabIndex = bootstrap.topLevelDestinations.indexOfFirst {
+                    it.route == currentDestination.route
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                bootstrap.topLevelDestinations.forEach { topLevelDestination ->
+                    val destination = AppDestination.fromRoute(topLevelDestination.route)
+                    Tab(
+                        selected = currentDestination == destination,
+                        onClick = { currentDestination = destination },
+                        text = { Text(topLevelDestination.label) },
+                    )
                 }
             }
+
+            AppNavHost(currentDestination)
         }
     }
 }
