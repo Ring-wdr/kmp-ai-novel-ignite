@@ -16,6 +16,12 @@ class DraftSessionRepositoryImpl(
             .executeAsOneOrNull()
             ?.toDomainModel()
 
+    override fun latestDraftSessions(): Map<Long, DraftSession> =
+        database.draftSessionQueries.selectLatestDraftSessions()
+            .executeAsList()
+            .map { it.toDomainModel() }
+            .associateBy(DraftSession::projectId)
+
     override suspend fun saveDraftSession(
         projectId: Long,
         sessionId: Long?,

@@ -53,4 +53,34 @@ class DraftSessionRepositoryImplTest {
                 .size,
         )
     }
+
+    @Test
+    fun latestDraftSessions_returnsLatestSessionPerProject() = runTest {
+        val database = TestDatabaseFactory.create()
+        val projectRepository = ProjectRepositoryImpl(database)
+        val draftSessionRepository = DraftSessionRepositoryImpl(database)
+        val firstProject = projectRepository.createProject(title = "Moon Archive", templateId = null)
+        val secondProject = projectRepository.createProject(title = "Neon Debt", templateId = null)
+
+        draftSessionRepository.saveDraftSession(
+            projectId = firstProject.id,
+            sessionId = null,
+            content = "First draft",
+        )
+        val latestFirst = draftSessionRepository.saveDraftSession(
+            projectId = firstProject.id,
+            sessionId = null,
+            content = "First draft revised",
+        )
+        val latestSecond = draftSessionRepository.saveDraftSession(
+            projectId = secondProject.id,
+            sessionId = null,
+            content = "Second project draft",
+        )
+
+        val latestByProject = draftSessionRepository.latestDraftSessions()
+
+        assertEquals(latestFirst.content, latestByProject[firstProject.id]?.content)
+        assertEquals(latestSecond.content, latestByProject[secondProject.id]?.content)
+    }
 }

@@ -19,6 +19,18 @@ WHERE project_id = ?
 ORDER BY updated_at_epoch_ms DESC, id DESC
 LIMIT 1;
 
+selectLatestDraftSessions:
+SELECT DraftSession.*
+FROM DraftSession
+WHERE DraftSession.id IN (
+    SELECT latest.id
+    FROM DraftSession latest
+    WHERE latest.project_id = DraftSession.project_id
+    ORDER BY latest.updated_at_epoch_ms DESC, latest.id DESC
+    LIMIT 1
+)
+ORDER BY DraftSession.updated_at_epoch_ms DESC, DraftSession.id DESC;
+
 selectDraftSessionById:
 SELECT *
 FROM DraftSession

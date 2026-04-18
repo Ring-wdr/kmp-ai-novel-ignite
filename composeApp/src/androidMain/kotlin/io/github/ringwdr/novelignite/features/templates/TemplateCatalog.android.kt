@@ -3,7 +3,7 @@ package io.github.ringwdr.novelignite.features.templates
 import io.github.ringwdr.novelignite.domain.model.Template
 import kotlin.time.Clock
 
-private object AndroidTemplateMemoryStore {
+internal object AndroidTemplateMemoryStore {
     private var nextId: Long = 1
     private val templates = mutableListOf<Template>()
 
