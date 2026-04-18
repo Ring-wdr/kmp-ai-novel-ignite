@@ -8,9 +8,17 @@ import kotlinx.coroutines.flow.flow
 
 class LocalOllamaEngine(
     private val modelsClient: OllamaModelsClient,
+    private val modelName: String,
 ) : InferenceEngine {
     override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-        emit(GenerationEvent.Final(toPrompt(request.actionType, request.manuscriptExcerpt, request.promptBlocks)))
+        val prompt = toPrompt(
+            actionType = request.actionType,
+            manuscriptExcerpt = request.manuscriptExcerpt,
+            promptBlocks = request.promptBlocks,
+        )
+        runCatching { modelsClient.generate(model = modelName, prompt = prompt) }
+            .onSuccess { emit(GenerationEvent.Final(it)) }
+            .onFailure { emit(GenerationEvent.Error(it.message ?: "Ollama generation failed.")) }
     }
 
     companion object {

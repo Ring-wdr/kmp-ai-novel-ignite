@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.ringwdr.novelignite.data.inference.FakeInferenceEngine
+import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
+import org.koin.mp.KoinPlatform.getKoin
 
 @Composable
 fun WorkshopScreen(
@@ -47,5 +49,7 @@ fun WorkshopScreen(
 
 @Composable
 private fun rememberWorkshopViewModel(): WorkshopViewModel = remember {
-    WorkshopViewModel(FakeInferenceEngine())
+    val inferenceEngine = runCatching { getKoin().get<InferenceEngine>() }
+        .getOrElse { FakeInferenceEngine() }
+    WorkshopViewModel(inferenceEngine)
 }

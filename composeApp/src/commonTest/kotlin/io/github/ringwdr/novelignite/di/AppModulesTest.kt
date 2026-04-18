@@ -1,6 +1,6 @@
 package io.github.ringwdr.novelignite.di
 
-import io.github.ringwdr.novelignite.data.inference.FakeInferenceEngine
+import io.github.ringwdr.novelignite.data.inference.LocalOllamaEngine
 import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -10,7 +10,7 @@ import org.koin.mp.KoinPlatform.getKoin
 
 class AppModulesTest {
     @Test
-    fun appModule_bindsInferenceEngineToFakeInferenceEngine() {
+    fun appModule_bindsInferenceEngineToPlatformImplementation() {
         stopKoin()
         startKoin {
             modules(appModule)
@@ -18,7 +18,7 @@ class AppModulesTest {
 
         val inferenceEngine = getKoin().get<InferenceEngine>()
 
-        assertIs<FakeInferenceEngine>(inferenceEngine)
+        assertIs<LocalOllamaEngine>(inferenceEngine)
         stopKoin()
     }
 }
