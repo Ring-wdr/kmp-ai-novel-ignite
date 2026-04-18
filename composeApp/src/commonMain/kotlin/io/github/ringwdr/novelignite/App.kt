@@ -22,9 +22,8 @@ import io.github.ringwdr.novelignite.navigation.AppNavHost
 @Preview
 fun App() {
     MaterialTheme {
-        val bootstrap = remember { createAppBootstrap() }
         var currentDestination by remember {
-            mutableStateOf(AppDestination.fromRoute(bootstrap.topLevelDestinations.first().route))
+            mutableStateOf(AppDestination.topLevelDestinations.first())
         }
 
         Column(
@@ -33,17 +32,14 @@ fun App() {
                 .fillMaxSize(),
         ) {
             PrimaryTabRow(
-                selectedTabIndex = bootstrap.topLevelDestinations.indexOfFirst {
-                    it.route == currentDestination.route
-                },
+                selectedTabIndex = AppDestination.topLevelDestinations.indexOf(currentDestination),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                bootstrap.topLevelDestinations.forEach { topLevelDestination ->
-                    val destination = AppDestination.fromRoute(topLevelDestination.route)
+                AppDestination.topLevelDestinations.forEach { destination ->
                     Tab(
                         selected = currentDestination == destination,
                         onClick = { currentDestination = destination },
-                        text = { Text(topLevelDestination.label) },
+                        text = { Text(destination.label) },
                     )
                 }
             }

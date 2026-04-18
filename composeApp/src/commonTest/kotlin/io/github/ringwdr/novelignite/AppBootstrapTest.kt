@@ -1,5 +1,6 @@
 package io.github.ringwdr.novelignite
 
+import io.github.ringwdr.novelignite.navigation.AppDestination
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -21,6 +22,16 @@ class AppBootstrapTest {
         assertEquals(
             listOf("workshop", "templates", "board", "library"),
             bootstrap.topLevelDestinations.map { it.route },
+        )
+    }
+
+    @Test
+    fun appBootstrap_derivesTopLevelDestinationsFromAppDestinationMetadata() {
+        val bootstrap = createAppBootstrap()
+
+        assertEquals(
+            AppDestination.topLevelDestinations.map { TopLevelDestination(it.route, it.label) },
+            bootstrap.topLevelDestinations,
         )
     }
 }

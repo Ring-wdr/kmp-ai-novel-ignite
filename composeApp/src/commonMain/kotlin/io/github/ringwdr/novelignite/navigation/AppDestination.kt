@@ -37,9 +37,9 @@ sealed class AppDestination {
     }
 
     companion object {
-        val entries: List<AppDestination> = listOf(Workshop, Templates, Board, Library)
+        val topLevelDestinations: List<AppDestination> = listOf(Workshop, Templates, Board, Library)
 
-        fun fromRoute(route: String): AppDestination = entries.firstOrNull { it.route == route }
+        fun fromRoute(route: String): AppDestination = topLevelDestinations.firstOrNull { it.route == route }
             ?: error("Unknown app destination route: $route")
     }
 }
