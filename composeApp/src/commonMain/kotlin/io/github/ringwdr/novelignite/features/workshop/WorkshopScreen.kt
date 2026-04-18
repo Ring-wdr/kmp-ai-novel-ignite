@@ -15,12 +15,16 @@ import io.github.ringwdr.novelignite.data.inference.FakeInferenceEngine
 
 @Composable
 fun WorkshopScreen(
-    viewModel: WorkshopViewModel = rememberWorkshopViewModel(),
+    viewModel: WorkshopViewModel? = null,
 ) {
-    val state by viewModel.state.collectAsState()
+    val internalViewModel = if (viewModel == null) rememberWorkshopViewModel() else null
+    val activeViewModel = viewModel ?: internalViewModel!!
+    val state by activeViewModel.state.collectAsState()
 
-    DisposableEffect(viewModel) {
-        onDispose { viewModel.clear() }
+    if (internalViewModel != null) {
+        DisposableEffect(internalViewModel) {
+            onDispose { internalViewModel.clear() }
+        }
     }
 
     Column(
@@ -32,11 +36,11 @@ fun WorkshopScreen(
         ChatPanel(
             generatedText = state.generatedText,
             isGenerating = state.isGenerating,
-            onContinueScene = viewModel::continueScene,
+            onContinueScene = activeViewModel::continueScene,
         )
         ManuscriptEditor(
             text = state.draftText,
-            onTextChange = viewModel::updateDraft,
+            onTextChange = activeViewModel::updateDraft,
         )
     }
 }

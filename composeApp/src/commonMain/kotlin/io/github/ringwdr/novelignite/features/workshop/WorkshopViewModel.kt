@@ -21,6 +21,8 @@ class WorkshopViewModel(
     private val scope: CoroutineScope = defaultWorkshopScope(),
 ) {
     private val _state = MutableStateFlow(WorkshopUiState())
+    private var nextGenerationId = 0
+    private var activeGenerationId = 0
     private var activeGenerationJob: Job? = null
     val state: StateFlow<WorkshopUiState> = _state
 
@@ -30,6 +32,8 @@ class WorkshopViewModel(
 
     fun continueScene() {
         if (activeGenerationJob?.isActive == true) return
+        val generationId = ++nextGenerationId
+        activeGenerationId = generationId
         _state.update { it.copy(isGenerating = true) }
         activeGenerationJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -46,8 +50,11 @@ class WorkshopViewModel(
                         is GenerationEvent.Final -> _state.update {
                             it.copy(generatedText = event.text)
                         }
-                        is GenerationEvent.Error -> _state.update {
-                            it.copy(isGenerating = false)
+                        is GenerationEvent.Error -> {
+                            _state.update { it.copy(isGenerating = false) }
+                            activeGenerationJob = null
+                            activeGenerationId = 0
+                            throw CancellationException("Generation failed")
                         }
                         else -> Unit
                     }
@@ -55,8 +62,11 @@ class WorkshopViewModel(
             } catch (throwable: Throwable) {
                 if (throwable is CancellationException) throw throwable
             } finally {
-                _state.update { it.copy(isGenerating = false) }
-                activeGenerationJob = null
+                if (activeGenerationId == generationId) {
+                    _state.update { it.copy(isGenerating = false) }
+                    activeGenerationJob = null
+                    activeGenerationId = 0
+                }
             }
         }
     }

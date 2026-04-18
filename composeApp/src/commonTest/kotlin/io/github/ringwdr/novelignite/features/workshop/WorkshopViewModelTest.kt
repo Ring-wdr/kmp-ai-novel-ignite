@@ -37,7 +37,7 @@ class WorkshopViewModelTest {
 
     @Test
     fun continueScene_clearsGeneratingWhenEngineSignalsError() = runTest {
-        val scope = backgroundScope
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         val viewModel = WorkshopViewModel(
             object : InferenceEngine {
                 override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
@@ -55,8 +55,39 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun continueScene_allowsRetryAfterEngineSignalsError() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val hold = Channel<Unit>()
+        var attempt = 0
+        val viewModel = WorkshopViewModel(
+            object : InferenceEngine {
+                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
+                    attempt += 1
+                    if (attempt == 1) {
+                        emit(GenerationEvent.Error("boom"))
+                        hold.receive()
+                    } else {
+                        emit(GenerationEvent.Final("recovered"))
+                    }
+                }
+            },
+            scope,
+        )
+
+        viewModel.updateDraft("The gate opened.")
+        viewModel.continueScene()
+        runCurrent()
+        viewModel.continueScene()
+        runCurrent()
+
+        assertEquals("recovered", viewModel.state.value.generatedText)
+        assertFalse(viewModel.state.value.isGenerating)
+        assertEquals(2, attempt)
+    }
+
+    @Test
     fun continueScene_clearsGeneratingWhenEngineThrows() = runTest {
-        val scope = backgroundScope
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         val viewModel = WorkshopViewModel(
             object : InferenceEngine {
                 override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
