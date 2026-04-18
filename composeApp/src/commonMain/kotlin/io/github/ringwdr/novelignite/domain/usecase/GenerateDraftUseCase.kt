@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.transform
 class GenerateDraftUseCase(
     private val inferenceEngine: InferenceEngine,
 ) {
-    operator fun invoke(request: GenerationRequest): Flow<GenerationEvent.Final> =
+    operator fun invoke(request: GenerationRequest): Flow<GenerationEvent> =
         inferenceEngine.streamGenerate(request).transform { event ->
-            if (event is GenerationEvent.Final) emit(event)
+            if (event is GenerationEvent.Final || event is GenerationEvent.Error) emit(event)
         }
 }
