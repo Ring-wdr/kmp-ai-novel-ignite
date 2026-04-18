@@ -21,7 +21,9 @@ class ProjectRepositoryImpl(
             updated_at_epoch_ms = now,
         )
 
-        database.projectQueries.selectAllProjects()
+        val projectId = database.projectQueries.lastInsertedRowId().executeAsOne()
+
+        database.projectQueries.selectProjectById(projectId)
             .executeAsOne()
             .toDomainModel()
     }

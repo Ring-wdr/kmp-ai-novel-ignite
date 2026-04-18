@@ -11,6 +11,11 @@ SELECT *
 FROM Project
 ORDER BY updated_at_epoch_ms DESC, id DESC;
 
+selectProjectById:
+SELECT *
+FROM Project
+WHERE id = ?;
+
 insertProject:
 INSERT INTO Project(
     title,
@@ -18,3 +23,6 @@ INSERT INTO Project(
     created_at_epoch_ms,
     updated_at_epoch_ms
 ) VALUES (?, ?, ?, ?);
+
+lastInsertedRowId:
+SELECT last_insert_rowid();
