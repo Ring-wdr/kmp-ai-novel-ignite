@@ -1,5 +1,7 @@
 # kmp-ai-novel-ignite
 
+This repository must start from the official Kotlin Multiplatform wizard output. Agent changes should extend the generated scaffold instead of recreating framework wiring by hand.
+
 Kotlin Multiplatform 기반의 AI 소설 작성 앱 프로젝트입니다.
 
 이 프로젝트는 `Android + Desktop`을 우선 대상으로 하며, 다음 흐름을 핵심 가치로 둡니다.
