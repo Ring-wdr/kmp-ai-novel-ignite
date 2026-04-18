@@ -29,10 +29,10 @@ $env:OPENROUTER_API_KEY="your-key"
 ## Verification
 
 - `./gradlew.bat :composeApp:allTests`
-- `./gradlew.bat :composeApp:desktopTest`
+- `./gradlew.bat :composeApp:jvmTest`
 - `./gradlew.bat :relay:test`
 
-Wizard scaffold adaptation note: `:composeApp:desktopTest` is not a generated Gradle task in this branch. The `desktopTest` source directory is wired into `:composeApp:jvmTest`, so use the command below for actual desktop smoke verification:
+Task 12's original plan referred to the desktop verification step as `desktopTest`, but this wizard scaffold wires the `desktopTest` source directory into `:composeApp:jvmTest`. Use the command below for actual desktop smoke verification in this branch:
 
 ```bash
 ./gradlew.bat :composeApp:jvmTest
