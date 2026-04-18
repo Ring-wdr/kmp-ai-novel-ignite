@@ -9,6 +9,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.ringwdr.novelignite.data.inference.FakeInferenceEngine
@@ -22,6 +24,7 @@ fun WorkshopScreen(
     val internalViewModel = if (viewModel == null) rememberWorkshopViewModel() else null
     val activeViewModel = viewModel ?: internalViewModel!!
     val state by activeViewModel.state.collectAsState()
+    val activeTemplate by ActiveWorkshopTemplateStore.selection.collectAsState()
 
     if (internalViewModel != null) {
         DisposableEffect(internalViewModel) {
@@ -35,6 +38,10 @@ fun WorkshopScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        Text(
+            text = activeTemplate?.let { "Workshop template: ${it.title}" } ?: "Workshop template: none",
+            style = MaterialTheme.typography.bodyMedium,
+        )
         ChatPanel(
             generatedText = state.generatedText,
             isGenerating = state.isGenerating,
