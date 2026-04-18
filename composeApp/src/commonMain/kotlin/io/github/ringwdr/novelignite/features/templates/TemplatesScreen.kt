@@ -44,6 +44,7 @@ fun TemplatesScreen() {
     val selectedTemplate = selectedTemplateId?.let { templateId ->
         templates.firstOrNull { it.id == templateId }
     }
+    val selectedTemplateVersions = selectedTemplate?.let { loadLocalTemplateVersions(it.id) }.orEmpty()
 
     Column(
         modifier = Modifier.padding(16.dp),
@@ -148,6 +149,27 @@ fun TemplatesScreen() {
                     }
                 },
             )
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Version history",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (selectedTemplateVersions.isEmpty()) {
+                        Text("No saved versions yet.")
+                    } else {
+                        Text("${selectedTemplateVersions.size} saved snapshots")
+                        selectedTemplateVersions.take(3).forEach { version ->
+                            Text("v${version.versionNumber} · ${version.title}")
+                        }
+                    }
+                }
+            }
         }
 
         if (templates.isEmpty()) {

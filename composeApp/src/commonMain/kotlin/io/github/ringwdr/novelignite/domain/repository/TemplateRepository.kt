@@ -1,6 +1,7 @@
 package io.github.ringwdr.novelignite.domain.repository
 
 import io.github.ringwdr.novelignite.domain.model.Template
+import io.github.ringwdr.novelignite.domain.model.TemplateVersion
 
 interface TemplateRepository {
     suspend fun saveTemplate(
@@ -19,4 +20,6 @@ interface TemplateRepository {
     ): Template
 
     fun listTemplates(): List<Template>
+
+    fun listTemplateVersions(templateId: Long): List<TemplateVersion>
 }

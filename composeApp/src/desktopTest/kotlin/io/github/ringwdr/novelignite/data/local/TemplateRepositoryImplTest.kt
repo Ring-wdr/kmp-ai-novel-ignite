@@ -86,4 +86,48 @@ class TemplateRepositoryImplTest {
             templates.first().promptBlocks,
         )
     }
+
+    @Test
+    fun saveTemplate_appendsVersionSnapshotsWithIncreasingNumbers() = runTest {
+        val database = TestDatabaseFactory.create()
+        val repository = TemplateRepositoryImpl(database)
+
+        val created = repository.saveTemplate(
+            title = "Noir Seoul",
+            genre = "Urban Fantasy",
+            premise = "A ghost broker solves debts",
+            worldSetting = "Night markets and hidden contracts",
+            characterCards = "Jin, Hyeon, Broker",
+            relationshipNotes = "Debt binds broker and ghost",
+            toneStyle = "Moody and elegant",
+            bannedElements = "No slapstick",
+            plotConstraints = "Reveal one secret per scene",
+            openingHook = "Rain on neon stone",
+            promptBlocks = listOf("Keep sensory detail high"),
+        )
+
+        repository.saveTemplate(
+            title = "Noir Seoul Revised",
+            genre = "Urban Fantasy",
+            premise = "A ghost broker negotiates a deeper debt",
+            worldSetting = "Night markets and hidden contracts",
+            characterCards = "Jin, Hyeon, Broker",
+            relationshipNotes = "Debt binds broker and ghost",
+            toneStyle = "Moody and elegant",
+            bannedElements = "No slapstick",
+            plotConstraints = "Reveal one secret per scene",
+            openingHook = "Rain on neon stone",
+            promptBlocks = listOf("Keep sensory detail high", "Keep dialogue sharp"),
+            templateId = created.id,
+        )
+
+        val versions = database.templateVersionQueries
+            .selectTemplateVersionsByTemplateId(created.id)
+            .executeAsList()
+
+        assertEquals(2, versions.size)
+        assertEquals(listOf(2L, 1L), versions.map { it.version_number })
+        assertEquals("Noir Seoul Revised", versions.first().title)
+        assertEquals("Noir Seoul", versions.last().title)
+    }
 }
