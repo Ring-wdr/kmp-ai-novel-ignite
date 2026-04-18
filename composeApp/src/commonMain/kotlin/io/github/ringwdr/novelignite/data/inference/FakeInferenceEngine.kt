@@ -6,7 +6,8 @@ import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
-class FakeInferenceEngine : InferenceEngine {
+// Test fixture kept in commonMain to satisfy the Task 6 scaffold contract.
+internal class FakeInferenceEngine : InferenceEngine {
     override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
         emit(GenerationEvent.Token("The gate opened."))
         emit(GenerationEvent.Token(" A silver wind answered."))
