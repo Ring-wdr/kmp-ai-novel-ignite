@@ -1,14 +1,10 @@
 package io.github.ringwdr.novelignite.features.templates
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -25,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import io.github.ringwdr.novelignite.domain.model.Template
 import io.github.ringwdr.novelignite.domain.model.TemplateVersion
 import io.github.ringwdr.novelignite.features.workshop.ActiveWorkshopTemplate
 import io.github.ringwdr.novelignite.features.workshop.ActiveWorkshopTemplateStore
@@ -271,97 +266,24 @@ fun TemplatesScreen() {
             }
         }
 
-        if (templates.isEmpty()) {
-            Text("No local templates yet. Create one below, then bind it to Workshop.")
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(templates, key = Template::id) { template ->
-                    TemplateListItem(
-                        template = template,
-                        isActive = activeTemplate?.id == template.id,
-                        isSelected = selectedTemplate?.id == template.id,
-                        onOpenTemplate = {
-                            selectedTemplateId = template.id
-                            detailTemplateEditorViewModel.loadTemplate(template)
-                            detailPromptBlockInput = TextFieldValue("")
-                            detailPromptBlockError = null
-                        },
-                        onDeleteTemplate = {
-                            scope.launch {
-                                deleteLocalTemplate(template.id)
-                                templates = loadLocalTemplates()
-                                if (activeTemplate?.id == template.id) {
-                                    ActiveWorkshopTemplateStore.clear()
-                                }
-                                if (selectedTemplateId == template.id) {
-                                    selectedTemplateId = null
-                                    detailPromptBlockInput = TextFieldValue("")
-                                    detailPromptBlockError = null
-                                }
-                            }
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun TemplateListItem(
-    template: Template,
-    isActive: Boolean,
-    isSelected: Boolean,
-    onOpenTemplate: () -> Unit,
-    onDeleteTemplate: () -> Unit = {},
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenTemplate),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = template.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = template.genre.ifBlank { "Uncategorized" },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = template.premise.ifBlank { "No premise yet." },
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (isSelected) {
-                Text(
-                    text = "Editing this template",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
+        TemplatesListPane(
+            templates = templates,
+            activeTemplate = activeTemplate,
+            highlightedTemplateId = null,
+            feedbackMessage = null,
+            onCreateTemplate = {},
+            onOpenTemplate = { template ->
+                selectedTemplateId = template.id
+                detailTemplateEditorViewModel.loadTemplate(template)
+                detailPromptBlockInput = TextFieldValue("")
+                detailPromptBlockError = null
+            },
+            onUseInWorkshop = { template ->
+                ActiveWorkshopTemplateStore.select(
+                    ActiveWorkshopTemplate(id = template.id, title = template.title)
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = {
-                        ActiveWorkshopTemplateStore.select(
-                            ActiveWorkshopTemplate(id = template.id, title = template.title)
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (isActive) "Selected for Workshop" else "Use in Workshop")
-                }
-                OutlinedButton(onClick = onDeleteTemplate) {
-                    Text("Delete")
-                }
-            }
-        }
+            },
+            onClearWorkshopTemplate = ActiveWorkshopTemplateStore::clear,
+        )
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import io.github.ringwdr.novelignite.domain.model.Template
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import org.junit.Rule
 
 class TemplateListItemTest {
@@ -11,7 +12,7 @@ class TemplateListItemTest {
     val rule = createComposeRule()
 
     @Test
-    fun rendersDeleteActionInTemplateListCard() {
+    fun rendersWorkshopSelectionAction_withoutDeleteAction() {
         rule.setContent {
             TemplateListItem(
                 template = Template(
@@ -30,13 +31,17 @@ class TemplateListItemTest {
                     createdAtEpochMs = 0L,
                     updatedAtEpochMs = 0L,
                 ),
-                isActive = false,
-                isSelected = false,
+                isActive = true,
+                isHighlighted = false,
                 onOpenTemplate = {},
-                onDeleteTemplate = {},
+                onUseInWorkshop = {},
             )
         }
 
-        rule.onNodeWithText("Delete").fetchSemanticsNode()
+        rule.onNodeWithText("Active in Workshop").fetchSemanticsNode()
+        rule.onNodeWithText("Selected for Workshop").fetchSemanticsNode()
+        assertFailsWith<AssertionError> {
+            rule.onNodeWithText("Delete").fetchSemanticsNode()
+        }
     }
 }
