@@ -34,7 +34,9 @@ internal fun WorkshopChatTimeline(
 ) {
     val listState = rememberLazyListState()
     val latestMessage = messages.lastOrNull()
-    val latestAssistantMessageId = messages.lastOrNull { it.role == WorkshopMessageRole.Assistant }?.id
+    val latestChoiceMessageId = latestMessage
+        ?.takeIf { it.role == WorkshopMessageRole.Assistant }
+        ?.id
 
     LaunchedEffect(
         latestMessage?.id,
@@ -116,7 +118,7 @@ internal fun WorkshopChatTimeline(
                                                 modifier = Modifier.fillMaxWidth(),
                                             )
                                         }
-                                        val showChoices = message.id == latestAssistantMessageId
+                                        val showChoices = message.id == latestChoiceMessageId
                                         if (showChoices) {
                                             assistant?.choices
                                             .orEmpty()

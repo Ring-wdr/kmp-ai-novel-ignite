@@ -249,6 +249,49 @@ class ChatPanelTest {
     }
 
     @Test
+    fun completedChoices_doNotResurface_whenFollowUpAssistantIsRemoved() {
+        rule.setContent {
+            ChatPanel(
+                messages = listOf(
+                    WorkshopChatMessage.assistant(
+                        id = "assistant-completed",
+                        text = "",
+                        isStreaming = false,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "Completed answer.",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-old",
+                                    label = "Old follow-up",
+                                    prompt = "Use the old follow-up.",
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Completed,
+                        ),
+                    ),
+                    WorkshopChatMessage.user(
+                        id = "user-follow-up",
+                        text = "Can you keep going?",
+                    ),
+                ),
+                chatInputText = "",
+                streamingStatus = WorkshopStreamingStatus.Idle,
+                errorMessage = "Generation failed.",
+                onChatInputChange = {},
+                onSendChatMessage = {},
+                onUseChoice = {},
+                onContinueScene = {},
+                onAbortGeneration = {},
+            )
+        }
+
+        rule.onNodeWithText("Can you keep going?").assertExists()
+        rule.onNodeWithText("Generation failed.").assertExists()
+        rule.onAllNodesWithText("Old follow-up", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
     fun composerSend_updatesFromTyping_andInvokesCallback_whenIdle() {
         var sent = 0
         var chatInputText by mutableStateOf("")
