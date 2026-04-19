@@ -92,7 +92,10 @@ class WorkshopViewModel(
                     ),
                     WorkshopChatMessage.assistant(
                         id = assistantMessageId,
-                        text = "",
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "",
+                            phase = WorkshopAssistantPhase.Streaming,
+                        ),
                         isStreaming = true,
                     ),
                 ),
@@ -168,7 +171,14 @@ class WorkshopViewModel(
             it.copy(
                 messages = it.messages.map { message ->
                     if (message.id == assistantMessageId && message.isStreaming) {
-                        message.copy(text = message.text + token, isStreaming = true)
+                        val assistant = message.assistant ?: return@map message
+                        message.withAssistant(
+                            assistant.copy(
+                                renderedMarkdown = assistant.renderedMarkdown + token,
+                                phase = WorkshopAssistantPhase.Streaming,
+                                failureMessage = null,
+                            )
+                        )
                     } else {
                         message
                     }
@@ -189,7 +199,14 @@ class WorkshopViewModel(
             it.copy(
                 messages = it.messages.map { message ->
                     if (message.id == assistantMessageId) {
-                        message.copy(text = finalText, isStreaming = false)
+                        val assistant = message.assistant ?: return@map message
+                        message.withAssistant(
+                            assistant.copy(
+                                renderedMarkdown = finalText,
+                                phase = WorkshopAssistantPhase.Completed,
+                                failureMessage = null,
+                            )
+                        )
                     } else {
                         message
                     }
@@ -231,3 +248,10 @@ private fun String.generationIdOrNull(): Int? {
 }
 
 private val GenerationMessageIdPattern = Regex("""generation-(\d+)-(?:user|assistant)""")
+
+private fun WorkshopChatMessage.withAssistant(assistant: WorkshopAssistantTurn): WorkshopChatMessage =
+    copy(
+        text = assistant.renderedMarkdown,
+        assistant = assistant,
+        isStreaming = assistant.phase == WorkshopAssistantPhase.Streaming,
+    )
