@@ -29,7 +29,8 @@ class WorkshopViewModel(
     private var activeGenerationId = 0
     private var activeAssistantMessageId: String? = null
     private var activeGenerationJob: Job? = null
-    private val persistQueue = Channel<WorkshopUiState>(capacity = Channel.UNLIMITED)
+    private var persistenceErrorMessage: String? = null
+    private val persistQueue = Channel<WorkshopUiState>(capacity = Channel.CONFLATED)
     private val persistenceConsumerJob: Job
     val state: StateFlow<WorkshopUiState> = _state
 
@@ -38,8 +39,9 @@ class WorkshopViewModel(
             for (snapshot in persistQueue) {
                 try {
                     persistState(snapshot)
+                    clearPersistenceFailure()
                 } catch (_: Throwable) {
-                    // Keep persistence alive so a single failed save does not permanently stop later writes.
+                    surfacePersistenceFailure()
                 }
             }
         }
@@ -106,7 +108,7 @@ class WorkshopViewModel(
         _state.update { current ->
             current.copy(
                 chatInputText = "",
-                errorMessage = null,
+                errorMessage = persistenceErrorMessage,
                 streamingStatus = WorkshopStreamingStatus.Streaming,
                 messages = current.messages + listOf(
                     WorkshopChatMessage.user(
@@ -172,6 +174,25 @@ class WorkshopViewModel(
 
     private fun persistCurrentState() {
         persistQueue.trySend(_state.value)
+    }
+
+    private fun surfacePersistenceFailure() {
+        persistenceErrorMessage = PersistenceFailureMessage
+        _state.update { current ->
+            current.copy(errorMessage = PersistenceFailureMessage)
+        }
+    }
+
+    private fun clearPersistenceFailure() {
+        val previousMessage = persistenceErrorMessage ?: return
+        persistenceErrorMessage = null
+        _state.update { current ->
+            if (current.errorMessage == previousMessage) {
+                current.copy(errorMessage = null)
+            } else {
+                current
+            }
+        }
     }
 
     private fun handleAssistantStreamEvent(
@@ -350,12 +371,14 @@ class WorkshopViewModel(
                     message.id == assistantMessageId && message.isStreaming
                 },
                 streamingStatus = WorkshopStreamingStatus.Recovering,
-                errorMessage = errorMessage,
+                errorMessage = errorMessage ?: persistenceErrorMessage,
             )
         }
         persistCurrentState()
     }
 }
+
+private const val PersistenceFailureMessage = "Failed to save workshop changes."
 
 private fun defaultWorkshopScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
