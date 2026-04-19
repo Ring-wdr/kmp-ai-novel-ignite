@@ -13,6 +13,7 @@ data class TemplateDraft(
 
 class TemplateEditorViewModel {
     val state = MutableStateFlow(TemplateEditorState())
+    private var baselineDraft: TemplateDraft = TemplateDraft()
 
     fun loadTemplate(template: Template) {
         loadDraft(
@@ -26,6 +27,7 @@ class TemplateEditorViewModel {
     }
 
     fun loadDraft(draft: TemplateDraft) {
+        baselineDraft = draft.normalized()
         state.value = TemplateEditorState(
             title = draft.title,
             genre = draft.genre,
@@ -33,6 +35,12 @@ class TemplateEditorViewModel {
             promptBlocks = draft.promptBlocks,
         )
     }
+
+    fun reset() {
+        loadDraft(TemplateDraft())
+    }
+
+    fun hasUnsavedChanges(): Boolean = snapshotDraft().normalized() != baselineDraft
 
     fun updateTitle(value: String) {
         state.update { it.copy(title = value) }
@@ -74,7 +82,12 @@ class TemplateEditorViewModel {
     }
 
     fun applyEnrichedDraft(draft: TemplateDraft) {
-        loadDraft(draft)
+        state.value = TemplateEditorState(
+            title = draft.title,
+            genre = draft.genre,
+            premise = draft.premise,
+            promptBlocks = draft.promptBlocks,
+        )
     }
 
     fun snapshotDraft(): TemplateDraft = state.value.toDraft()
@@ -83,20 +96,10 @@ class TemplateEditorViewModel {
         onSave: suspend (TemplateDraft) -> Template,
         resetAfterSave: Boolean = true,
     ): Template {
-        val snapshot = state.value
-        val normalizedPromptBlocks = snapshot.promptBlocks
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        val savedTemplate = onSave(
-            TemplateDraft(
-                title = snapshot.title.trim(),
-                genre = snapshot.genre.trim(),
-                premise = snapshot.premise.trim(),
-                promptBlocks = normalizedPromptBlocks,
-            )
-        )
+        val normalizedDraft = state.value.toDraft().normalized()
+        val savedTemplate = onSave(normalizedDraft)
         if (resetAfterSave) {
-            state.value = TemplateEditorState()
+            reset()
         } else {
             loadTemplate(savedTemplate)
         }
@@ -109,4 +112,11 @@ private fun TemplateEditorState.toDraft(): TemplateDraft = TemplateDraft(
     genre = genre,
     premise = premise,
     promptBlocks = promptBlocks,
+)
+
+private fun TemplateDraft.normalized(): TemplateDraft = TemplateDraft(
+    title = title.trim(),
+    genre = genre.trim(),
+    premise = premise.trim(),
+    promptBlocks = promptBlocks.map { it.trim() }.filter { it.isNotBlank() },
 )

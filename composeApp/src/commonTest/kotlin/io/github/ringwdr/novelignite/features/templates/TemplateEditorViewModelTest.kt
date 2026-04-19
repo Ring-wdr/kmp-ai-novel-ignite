@@ -207,4 +207,93 @@ class TemplateEditorViewModelTest {
             capturedDraft,
         )
     }
+
+    @Test
+    fun hasUnsavedChanges_isFalseImmediatelyAfterLoadDraft_andTrueAfterEdit() {
+        val viewModel = TemplateEditorViewModel()
+
+        viewModel.loadDraft(
+            TemplateDraft(
+                title = "Noir Seoul",
+                genre = "Urban Fantasy",
+                premise = "A ghost broker solves debts",
+                promptBlocks = listOf("Keep sensory detail high"),
+            )
+        )
+
+        assertEquals(false, viewModel.hasUnsavedChanges())
+
+        viewModel.updatePremise("A broker chases a deeper debt")
+
+        assertEquals(true, viewModel.hasUnsavedChanges())
+    }
+
+    @Test
+    fun applyEnrichedDraft_keepsEditorDirty() {
+        val viewModel = TemplateEditorViewModel()
+
+        viewModel.loadDraft(
+            TemplateDraft(
+                title = "Noir Seoul",
+                genre = "Urban Fantasy",
+                premise = "A ghost broker solves debts",
+                promptBlocks = listOf("Keep sensory detail high"),
+            )
+        )
+        viewModel.updateTitle("Noir Seoul Revised")
+
+        assertEquals(true, viewModel.hasUnsavedChanges())
+
+        viewModel.applyEnrichedDraft(
+            TemplateDraft(
+                title = "Noir Seoul Revised",
+                genre = "Urban Fantasy",
+                premise = "A ghost broker solves debts with sharper stakes",
+                promptBlocks = listOf("Keep sensory detail high", "Add more tension"),
+            )
+        )
+
+        assertEquals(true, viewModel.hasUnsavedChanges())
+    }
+
+    @Test
+    fun saveTemplate_withoutReset_refreshesDirtyBaselineToSavedDraft() = runTest {
+        val viewModel = TemplateEditorViewModel()
+
+        viewModel.loadDraft(
+            TemplateDraft(
+                title = "Noir Seoul",
+                genre = "Urban Fantasy",
+                premise = "A ghost broker solves debts",
+                promptBlocks = listOf("Keep sensory detail high"),
+            )
+        )
+        viewModel.updateTitle("Noir Seoul Revised")
+
+        assertEquals(true, viewModel.hasUnsavedChanges())
+
+        viewModel.saveTemplate(
+            onSave = { draft ->
+                Template(
+                    id = 42,
+                    title = draft.title,
+                    genre = draft.genre,
+                    premise = draft.premise,
+                    worldSetting = "",
+                    characterCards = "",
+                    relationshipNotes = "",
+                    toneStyle = "",
+                    bannedElements = "",
+                    plotConstraints = "",
+                    openingHook = "",
+                    promptBlocks = draft.promptBlocks,
+                    createdAtEpochMs = 1,
+                    updatedAtEpochMs = 2,
+                )
+            },
+            resetAfterSave = false,
+        )
+
+        assertEquals(false, viewModel.hasUnsavedChanges())
+    }
 }

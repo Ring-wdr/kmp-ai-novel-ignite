@@ -377,6 +377,8 @@ git commit -m "feat: add templates screen state foundation"
 
 ## Task 2: Extract A List-First Catalog Pane And Remove Delete From List Cards
 
+Note: This task is still a midpoint before the full Task 3 route split. While the extraction should stay focused, it may add narrow safety wiring in `TemplatesScreen.kt` if that is the smallest way to avoid temporary user-visible regressions. In particular, it is acceptable to keep `New Template` usable, to keep delete reachable somewhere outside the list card, and to pass live feedback/highlight state into `TemplatesListPane(...)` instead of hard-coded `null` when that preserves current behavior.
+
 **Files:**
 - Create: `composeApp/src/commonMain/kotlin/io/github/ringwdr/novelignite/features/templates/TemplatesListPane.kt`
 - Modify: `composeApp/src/commonMain/kotlin/io/github/ringwdr/novelignite/features/templates/TemplatesScreen.kt`
@@ -603,7 +605,7 @@ internal fun TemplateListItem(
 }
 ```
 
-Update the list portion of `composeApp/src/commonMain/kotlin/io/github/ringwdr/novelignite/features/templates/TemplatesScreen.kt` by deleting the in-file `TemplateListItem(...)` implementation and replacing the top-level list section with:
+Update the list portion of `composeApp/src/commonMain/kotlin/io/github/ringwdr/novelignite/features/templates/TemplatesScreen.kt` by deleting the in-file `TemplateListItem(...)` implementation and replacing the top-level list section with a `TemplatesListPane(...)` call. The minimum required wiring is:
 
 ```kotlin
         TemplatesListPane(
@@ -628,6 +630,12 @@ Update the list portion of `composeApp/src/commonMain/kotlin/io/github/ringwdr/n
 ```
 
 Then remove the old `TemplateListItem(...)` function from the bottom of `TemplatesScreen.kt`.
+
+If needed to preserve current behavior until Task 3 lands, the concrete wiring may also:
+
+- use a meaningful `onCreateTemplate` callback instead of a no-op
+- pass non-null `highlightedTemplateId` / `feedbackMessage`
+- keep delete reachable elsewhere on the screen, as long as it does not return to the list card
 
 - [ ] **Step 4: Run the list-card regression test**
 
