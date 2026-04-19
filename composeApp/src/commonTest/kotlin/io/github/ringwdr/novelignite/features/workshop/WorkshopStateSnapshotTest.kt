@@ -60,7 +60,7 @@ class WorkshopStateSnapshotTest {
 
     @Test
     fun toUiState_restoresIdleStateWithoutRevivingStreamingAssistantTurn() {
-        val completedAssistant = WorkshopAssistantTurn(
+        val restoredAssistant = WorkshopAssistantTurn(
             renderedMarkdown = "Done",
             choices = listOf(
                 WorkshopChoice(
@@ -87,7 +87,7 @@ class WorkshopStateSnapshotTest {
                     id = "a-2",
                     role = WorkshopMessageRole.Assistant,
                     text = "Done",
-                    assistant = completedAssistant,
+                    assistant = restoredAssistant.copy(phase = WorkshopAssistantPhase.Streaming),
                 ),
             ),
             errorMessage = "Should not persist",
@@ -102,7 +102,7 @@ class WorkshopStateSnapshotTest {
         assertEquals(
             listOf(
                 WorkshopChatMessage.user("u-1", "Hello"),
-                WorkshopChatMessage.assistant("a-2", assistant = completedAssistant),
+                WorkshopChatMessage.assistant("a-2", assistant = restoredAssistant),
             ),
             restored.messages,
         )

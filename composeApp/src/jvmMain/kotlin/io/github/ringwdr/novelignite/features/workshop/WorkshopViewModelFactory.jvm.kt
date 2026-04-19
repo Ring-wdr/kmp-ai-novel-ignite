@@ -6,6 +6,11 @@ import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
 import io.github.ringwdr.novelignite.data.local.DraftSessionRepositoryImpl
 import io.github.ringwdr.novelignite.data.local.openDesktopDatabase
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 private const val DefaultWorkshopProjectTitle = "Workshop Draft"
 private const val DefaultWorkshopTemplateId = "workshop-default-template"
@@ -103,9 +108,98 @@ private fun buildStoredContent(state: WorkshopUiState): String =
 private fun parseStoredState(content: String): WorkshopUiState =
     runCatching { workshopStateJson.decodeFromString<WorkshopStateSnapshot>(content).toUiState() }
         .recoverCatching {
-            workshopStateJson.decodeFromString<LegacyStoredWorkshopState>(content).toUiState()
+            parseFlexibleSnapshotState(content)
+                ?: workshopStateJson.decodeFromString<LegacyStoredWorkshopState>(content).toUiState()
         }
         .getOrElse { WorkshopUiState(draftText = content) }
+
+private fun parseFlexibleSnapshotState(content: String): WorkshopUiState? {
+    val element = runCatching { workshopStateJson.parseToJsonElement(content) }.getOrNull() ?: return null
+    val objectElement = element as? JsonObject ?: return null
+    if ("messages" !in objectElement) return null
+
+    return WorkshopUiState(
+        draftText = objectElement["draftText"].stringValueOrEmpty(),
+        messages = objectElement["messages"].toWorkshopMessages(),
+        streamingStatus = WorkshopStreamingStatus.Idle,
+        errorMessage = null,
+    )
+}
+
+private fun JsonElement?.stringValueOrEmpty(): String =
+    (this as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+private fun JsonElement?.toWorkshopMessages(): List<WorkshopChatMessage> =
+    (this as? JsonArray)
+        ?.mapNotNull { element -> element.toWorkshopMessageOrNull() }
+        .orEmpty()
+
+private fun JsonElement.toWorkshopMessageOrNull(): WorkshopChatMessage? {
+    val objectElement = this as? JsonObject ?: return null
+    val id = objectElement["id"].stringValueOrEmpty().takeIf { it.isNotBlank() } ?: return null
+    val role = objectElement["role"].stringValueOrEmpty().toWorkshopMessageRoleOrNull() ?: return null
+    val text = objectElement["text"].stringValueOrEmpty()
+
+    return when (role) {
+        WorkshopMessageRole.User -> WorkshopChatMessage.user(id = id, text = text)
+        WorkshopMessageRole.Assistant -> WorkshopChatMessage.assistant(
+            id = id,
+            assistant = objectElement["assistant"].toWorkshopAssistantOrNull(text)
+                ?: WorkshopAssistantTurn(
+                    renderedMarkdown = text,
+                    phase = WorkshopAssistantPhase.Completed,
+                ),
+        )
+    }
+}
+
+private fun JsonElement?.toWorkshopAssistantOrNull(fallbackMarkdown: String): WorkshopAssistantTurn? {
+    val objectElement = this as? JsonObject ?: return null
+    return WorkshopAssistantTurn(
+        renderedMarkdown = objectElement["renderedMarkdown"].stringValueOrEmpty().ifBlank { fallbackMarkdown },
+        choices = objectElement["choices"].toWorkshopChoices(),
+        metadata = objectElement["metadata"].toWorkshopAssistantMetadata(),
+        phase = WorkshopAssistantPhase.Completed,
+        failureMessage = objectElement["failureMessage"].stringValueOrEmpty().takeIf { it.isNotBlank() },
+    )
+}
+
+private fun JsonElement?.toWorkshopChoices(): List<WorkshopChoice> =
+    (this as? JsonArray)
+        ?.mapNotNull { element ->
+            val objectElement = element as? JsonObject ?: return@mapNotNull null
+            val id = objectElement["id"].stringValueOrEmpty().takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val label = objectElement["label"].stringValueOrEmpty().takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val prompt = objectElement["prompt"].stringValueOrEmpty().ifBlank { label }
+            val style = when (objectElement["style"].stringValueOrEmpty()) {
+                WorkshopChoiceStyle.Primary.name -> WorkshopChoiceStyle.Primary
+                WorkshopChoiceStyle.Secondary.name -> WorkshopChoiceStyle.Secondary
+                else -> WorkshopChoiceStyle.Secondary
+            }
+
+            WorkshopChoice(
+                id = id,
+                label = label,
+                prompt = prompt,
+                style = style,
+            )
+        }
+        .orEmpty()
+
+private fun JsonElement?.toWorkshopAssistantMetadata(): WorkshopAssistantMetadata =
+    (this as? JsonObject)?.let { objectElement ->
+        WorkshopAssistantMetadata(
+            title = objectElement["title"].stringValueOrEmpty().takeIf { it.isNotBlank() },
+            badge = objectElement["badge"].stringValueOrEmpty().takeIf { it.isNotBlank() },
+        )
+    } ?: WorkshopAssistantMetadata()
+
+private fun String.toWorkshopMessageRoleOrNull(): WorkshopMessageRole? =
+    when (this) {
+        WorkshopMessageRole.User.name -> WorkshopMessageRole.User
+        WorkshopMessageRole.Assistant.name -> WorkshopMessageRole.Assistant
+        else -> null
+    }
 
 @kotlinx.serialization.Serializable
 private data class LegacyStoredWorkshopState(

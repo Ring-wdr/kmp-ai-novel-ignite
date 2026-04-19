@@ -51,13 +51,24 @@ private fun List<WorkshopPersistedMessage>.toUiMessages(): List<WorkshopChatMess
 
 private fun WorkshopPersistedMessage.toUiMessage(id: String): WorkshopChatMessage =
     if (role == WorkshopMessageRole.Assistant) {
+        val restoredAssistant = (assistant ?: WorkshopAssistantTurn(
+            renderedMarkdown = text,
+            phase = WorkshopAssistantPhase.Completed,
+        )).normalizedForRestore()
         WorkshopChatMessage.assistant(
             id = id,
-            assistant = assistant ?: WorkshopAssistantTurn(
-                renderedMarkdown = text,
-                phase = WorkshopAssistantPhase.Completed,
-            ),
+            assistant = restoredAssistant,
         )
     } else {
         WorkshopChatMessage.user(id = id, text = text)
+    }
+
+private fun WorkshopAssistantTurn.normalizedForRestore(): WorkshopAssistantTurn =
+    if (phase == WorkshopAssistantPhase.Completed) {
+        this
+    } else {
+        copy(
+            phase = WorkshopAssistantPhase.Completed,
+            failureMessage = null,
+        )
     }

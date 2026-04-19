@@ -23,7 +23,7 @@ class WorkshopViewModelFactoryLegacyMigrationTest {
     }
 
     @Test
-    fun snapshotJson_restoresCompletedTypedAssistantTurnAndIgnoresUnknownFields() {
+    fun snapshotJson_restoresCompletedTypedAssistantTurnAndIgnoresUnknownEnumValues() {
         val snapshotJson = """
             {
               "draftText": "Draft from disk",
@@ -45,14 +45,14 @@ class WorkshopViewModelFactoryLegacyMigrationTest {
                         "id": "choice-1",
                         "label": "Keep going",
                         "prompt": "Keep going",
-                        "style": "Primary"
+                        "style": "Tertiary"
                       }
                     ],
                     "metadata": {
                       "title": "Recovered summary",
                       "badge": "Completed"
                     },
-                    "phase": "Completed",
+                    "phase": "Paused",
                     "failureMessage": null
                   }
                 }
@@ -76,7 +76,7 @@ class WorkshopViewModelFactoryLegacyMigrationTest {
                                 id = "choice-1",
                                 label = "Keep going",
                                 prompt = "Keep going",
-                                style = WorkshopChoiceStyle.Primary,
+                                style = WorkshopChoiceStyle.Secondary,
                             ),
                         ),
                         metadata = WorkshopAssistantMetadata(
