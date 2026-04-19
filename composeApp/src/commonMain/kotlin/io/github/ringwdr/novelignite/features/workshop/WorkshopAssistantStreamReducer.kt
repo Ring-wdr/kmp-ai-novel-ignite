@@ -5,18 +5,27 @@ object WorkshopAssistantStreamReducer {
         state: WorkshopUiState,
         event: WorkshopAssistantStreamEvent,
     ): WorkshopUiState = when (event) {
-        is WorkshopAssistantStreamEvent.Start -> state.copy(
-            streamingStatus = WorkshopStreamingStatus.Streaming,
-            errorMessage = null,
-            messages = state.messages + WorkshopChatMessage(
-                id = event.messageId,
-                role = WorkshopMessageRole.Assistant,
-                assistant = WorkshopAssistantTurn(
-                    phase = WorkshopAssistantPhase.Streaming,
-                ),
-                isStreaming = true,
-            ),
-        )
+        is WorkshopAssistantStreamEvent.Start -> {
+            val hasActiveAssistant = state.messages.any { message ->
+                message.role == WorkshopMessageRole.Assistant && message.isStreaming
+            }
+            val hasMessageId = state.messages.any { message -> message.id == event.messageId }
+            if (hasActiveAssistant || hasMessageId) {
+                state
+            } else {
+                state.copy(
+                    streamingStatus = WorkshopStreamingStatus.Streaming,
+                    errorMessage = null,
+                    messages = state.messages + WorkshopChatMessage.assistant(
+                        id = event.messageId,
+                        assistant = WorkshopAssistantTurn(
+                            phase = WorkshopAssistantPhase.Streaming,
+                        ),
+                        isStreaming = true,
+                    ),
+                )
+            }
+        }
 
         is WorkshopAssistantStreamEvent.MarkdownDelta -> state.updateAssistant(event.messageId) { current ->
             current.copy(
@@ -55,10 +64,12 @@ object WorkshopAssistantStreamReducer {
             streamingStatus = WorkshopStreamingStatus.Idle,
         )
 
-        is WorkshopAssistantStreamEvent.Error -> state.copy(
-            messages = state.messages.filterNot { message ->
-                message.id == event.messageId && message.role == WorkshopMessageRole.Assistant
-            },
+        is WorkshopAssistantStreamEvent.Error -> state.updateAssistant(event.messageId) { current ->
+            current.copy(
+                phase = WorkshopAssistantPhase.Failed,
+                failureMessage = event.message,
+            )
+        }.copy(
             streamingStatus = WorkshopStreamingStatus.Idle,
             errorMessage = event.message,
         )
@@ -69,16 +80,18 @@ private inline fun WorkshopUiState.updateAssistant(
     messageId: String,
     transform: (WorkshopAssistantTurn) -> WorkshopAssistantTurn,
 ): WorkshopUiState {
-    var updated = false
-    val updatedMessages = messages.map { message ->
-        if (message.id != messageId || message.role != WorkshopMessageRole.Assistant) {
-            message
-        } else {
-            updated = true
-            message.withAssistant(transform(message.assistant ?: WorkshopAssistantTurn()))
-        }
+    val index = messages.indexOfFirst { message ->
+        message.id == messageId &&
+            message.role == WorkshopMessageRole.Assistant &&
+            message.assistant?.phase == WorkshopAssistantPhase.Streaming
     }
-    return if (updated) copy(messages = updatedMessages) else this
+    if (index < 0) return this
+
+    val current = messages[index]
+    val assistant = current.assistant ?: return this
+    val updatedMessages = messages.toMutableList()
+    updatedMessages[index] = current.withAssistant(transform(assistant))
+    return copy(messages = updatedMessages)
 }
 
 private fun WorkshopChatMessage.withAssistant(assistant: WorkshopAssistantTurn): WorkshopChatMessage =

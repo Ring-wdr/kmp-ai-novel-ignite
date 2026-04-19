@@ -32,6 +32,80 @@ class WorkshopAssistantStreamReducerTest {
     }
 
     @Test
+    fun start_ignoresSecondActiveTurnWhileStreaming() {
+        val base = WorkshopAssistantStreamReducer.apply(
+            state = WorkshopUiState(),
+            event = WorkshopAssistantStreamEvent.Start(
+                requestId = "request-1",
+                messageId = "generation-1-assistant",
+            ),
+        )
+
+        val updated = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.Start(
+                requestId = "request-2",
+                messageId = "generation-2-assistant",
+            ),
+        )
+
+        assertEquals(base, updated)
+    }
+
+    @Test
+    fun markdownDelta_ignoresLegacyAssistantMessageWithoutTypedState() {
+        val base = WorkshopUiState(
+            messages = listOf(
+                WorkshopChatMessage(
+                    id = "generation-1-assistant",
+                    role = WorkshopMessageRole.Assistant,
+                    text = "Legacy",
+                    assistant = null,
+                    isStreaming = true,
+                ),
+            ),
+            streamingStatus = WorkshopStreamingStatus.Streaming,
+        )
+
+        val updated = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.MarkdownDelta(
+                messageId = "generation-1-assistant",
+                markdown = " ignored",
+            ),
+        )
+
+        assertEquals(base, updated)
+    }
+
+    @Test
+    fun markdownDelta_ignoresCompletedAssistantTurn() {
+        val base = WorkshopUiState(
+            messages = listOf(
+                WorkshopChatMessage.assistant(
+                    id = "generation-1-assistant",
+                    assistant = WorkshopAssistantTurn(
+                        renderedMarkdown = "Draft",
+                        phase = WorkshopAssistantPhase.Completed,
+                    ),
+                    isStreaming = false,
+                ),
+            ),
+            streamingStatus = WorkshopStreamingStatus.Idle,
+        )
+
+        val updated = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.MarkdownDelta(
+                messageId = "generation-1-assistant",
+                markdown = " ignored",
+            ),
+        )
+
+        assertEquals(base, updated)
+    }
+
+    @Test
     fun choicesReplace_overwritesPreviousChoiceSurface() {
         val base = WorkshopUiState(
             messages = listOf(
@@ -102,5 +176,37 @@ class WorkshopAssistantStreamReducerTest {
         assertFalse(completed.messages.single().isStreaming)
         assertEquals("Draft", assistant.renderedMarkdown)
         assertEquals(WorkshopStreamingStatus.Idle, completed.streamingStatus)
+    }
+
+    @Test
+    fun error_marksAssistantTurnFailedAndKeepsTypedState() {
+        val base = WorkshopUiState(
+            messages = listOf(
+                WorkshopChatMessage.assistant(
+                    id = "generation-1-assistant",
+                    assistant = WorkshopAssistantTurn(
+                        renderedMarkdown = "Draft",
+                        phase = WorkshopAssistantPhase.Streaming,
+                    ),
+                    isStreaming = true,
+                ),
+            ),
+            streamingStatus = WorkshopStreamingStatus.Streaming,
+        )
+
+        val failed = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.Error(
+                messageId = "generation-1-assistant",
+                message = "boom",
+            ),
+        )
+
+        val assistant = failed.messages.single().assistant!!
+        assertEquals(WorkshopAssistantPhase.Failed, assistant.phase)
+        assertEquals("boom", assistant.failureMessage)
+        assertFalse(failed.messages.single().isStreaming)
+        assertEquals(WorkshopStreamingStatus.Idle, failed.streamingStatus)
+        assertEquals("boom", failed.errorMessage)
     }
 }
