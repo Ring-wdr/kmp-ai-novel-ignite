@@ -57,6 +57,7 @@ fun ChatPanel(
             WorkshopChatTimeline(
                 messages = messages,
                 onUseChoice = onUseChoice,
+                choicesEnabled = isReady,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),

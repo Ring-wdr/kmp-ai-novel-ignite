@@ -350,6 +350,48 @@ class ChatPanelTest {
     }
 
     @Test
+    fun recoveringState_disablesLatestChoiceButtons() {
+        rule.setContent {
+            ChatPanel(
+                messages = listOf(
+                    WorkshopChatMessage.assistant(
+                        id = "assistant-latest",
+                        text = "",
+                        isStreaming = false,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "Recovered answer.",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-latest",
+                                    label = "Continue scene",
+                                    prompt = "Continue the scene from the checkpoint.",
+                                    style = WorkshopChoiceStyle.Primary,
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Completed,
+                        ),
+                    ),
+                ),
+                chatInputText = "",
+                streamingStatus = WorkshopStreamingStatus.Recovering,
+                errorMessage = null,
+                onChatInputChange = {},
+                onSendChatMessage = {},
+                onUseChoice = {},
+                onContinueScene = {},
+                onAbortGeneration = {},
+            )
+        }
+
+        assertContains(
+            rule.onNodeWithTag("workshop-choice-choice-latest", useUnmergedTree = true).printToString(),
+            "Text = '[Continue scene]'",
+        )
+        rule.onNodeWithTag("workshop-choice-choice-latest").assertIsNotEnabled()
+    }
+
+    @Test
     fun timeline_autoFollowsNewestMessage() {
         rule.setContent {
             ChatPanel(

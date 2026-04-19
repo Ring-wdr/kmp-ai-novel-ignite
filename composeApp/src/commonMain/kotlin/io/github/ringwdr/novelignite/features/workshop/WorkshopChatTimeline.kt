@@ -30,6 +30,7 @@ private fun workshopChoiceButtonTag(choiceId: String): String = "workshop-choice
 internal fun WorkshopChatTimeline(
     messages: List<WorkshopChatMessage>,
     onUseChoice: (String) -> Unit,
+    choicesEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -131,7 +132,7 @@ internal fun WorkshopChatTimeline(
                                                         when (choice.style) {
                                                             WorkshopChoiceStyle.Primary -> Button(
                                                                 onClick = { onUseChoice(choice.prompt) },
-                                                                enabled = !isStreaming,
+                                                                enabled = choicesEnabled && !isStreaming,
                                                                 modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
                                                             ) {
                                                                 Text(choice.label)
@@ -139,7 +140,7 @@ internal fun WorkshopChatTimeline(
 
                                                             WorkshopChoiceStyle.Secondary -> OutlinedButton(
                                                                 onClick = { onUseChoice(choice.prompt) },
-                                                                enabled = !isStreaming,
+                                                                enabled = choicesEnabled && !isStreaming,
                                                                 modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
                                                             ) {
                                                                 Text(choice.label)
