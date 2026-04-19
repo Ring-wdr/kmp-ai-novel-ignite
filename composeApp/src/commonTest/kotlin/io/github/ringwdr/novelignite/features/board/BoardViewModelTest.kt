@@ -72,7 +72,7 @@ class BoardViewModelTest {
         viewModel.startRemix()
 
         val remix = assertNotNull(viewModel.state.value.activeRemix)
-        assertEquals(11L, remix.sourceVersion.id)
+        assertEquals(11L, assertNotNull(remix.sourceVersion).id)
         assertEquals(
             "Noir Seoul Revised Remix",
             remix.draft.title,
