@@ -85,24 +85,19 @@ class WorkshopAssistantStreamSourceTest {
     }
 
     @Test
-    fun selector_usesFixtureModeWhenRequested() = runTest {
-        val original = System.getProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE")
-        try {
-            System.setProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE", "fixture")
-
-            val source = createWorkshopAssistantStreamSource(
-                inferenceEngine = object : InferenceEngine {
-                    override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flowOf()
-                },
-            )
-
-            assertIs<FixtureWorkshopAssistantStreamSource>(source)
-        } finally {
-            if (original == null) {
-                System.clearProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE")
-            } else {
-                System.setProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE", original)
-            }
+    fun selector_usesFixtureModeWhenEnvRequestsIt() = runTest {
+        val mode = workshopStreamMode { key ->
+            if (key == "NOVEL_IGNITE_WORKSHOP_STREAM_MODE") "fixture" else null
         }
+
+        val source = createWorkshopAssistantStreamSource(
+            inferenceEngine = object : InferenceEngine {
+                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flowOf()
+            },
+            streamMode = mode,
+        )
+
+        assertEquals("fixture", mode)
+        assertIs<FixtureWorkshopAssistantStreamSource>(source)
     }
 }

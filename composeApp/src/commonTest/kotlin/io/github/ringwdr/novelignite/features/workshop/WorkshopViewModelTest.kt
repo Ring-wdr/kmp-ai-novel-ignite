@@ -156,6 +156,35 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun sendChatMessage_ignoresWrongMessageIdsFromTypedEvents() = runTest {
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta("generation-999-assistant", "wrong"))
+                emit(WorkshopAssistantStreamEvent.ChoicesReplace("generation-999-assistant", listOf(
+                    WorkshopChoice(id = "wrong", label = "Wrong", prompt = "Wrong"),
+                )))
+                emit(WorkshopAssistantStreamEvent.Error("generation-999-assistant", "wrong boom"))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "right"))
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
+            },
+        )
+
+        viewModel.updateChatInput("Continue the scene")
+        viewModel.sendChatMessage()
+        runCurrent()
+
+        val assistant = viewModel.state.value.messages.last().assistant!!
+        assertEquals("right", assistant.renderedMarkdown)
+        assertEquals(emptyList(), assistant.choices)
+        assertEquals(WorkshopAssistantPhase.Completed, assistant.phase)
+        assertNull(viewModel.state.value.errorMessage)
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
+    }
+
+    @Test
     fun abortGeneration_entersRecoveringUntilCollectorFinishes_thenAllowsRetry() = runTest {
         val release = Channel<Unit>()
         val requests = mutableListOf<GenerationRequest>()

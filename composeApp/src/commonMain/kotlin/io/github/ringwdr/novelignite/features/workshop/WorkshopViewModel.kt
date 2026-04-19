@@ -55,6 +55,7 @@ class WorkshopViewModel(
         val generationId = activeGenerationId
         cleanupStreamingAssistant(
             generationId = generationId,
+            assistantMessageId = activeAssistantMessageId,
             errorMessage = null,
         )
         activeGenerationJob?.cancel(CancellationException("User aborted generation"))
@@ -115,7 +116,6 @@ class WorkshopViewModel(
                 ).collect { event ->
                     handleAssistantStreamEvent(
                         generationId = generationId,
-                        assistantMessageId = assistantMessageId,
                         event = event,
                     )
                 }
@@ -126,6 +126,7 @@ class WorkshopViewModel(
                 if (activeGenerationId == generationId) {
                     cleanupStreamingAssistant(
                         generationId = generationId,
+                        assistantMessageId = activeAssistantMessageId,
                         errorMessage = throwable.message ?: "Generation failed.",
                     )
                 }
@@ -155,34 +156,35 @@ class WorkshopViewModel(
 
     private fun handleAssistantStreamEvent(
         generationId: Int,
-        assistantMessageId: String,
         event: WorkshopAssistantStreamEvent,
     ) {
         when (event) {
             is WorkshopAssistantStreamEvent.Start -> ensureStreamingAssistant(event.messageId)
             is WorkshopAssistantStreamEvent.MarkdownDelta -> appendAssistantToken(
-                assistantMessageId = assistantMessageId,
+                assistantMessageId = event.messageId,
                 token = event.markdown,
             )
             is WorkshopAssistantStreamEvent.ChoicesReplace -> updateAssistantChoices(
-                assistantMessageId = assistantMessageId,
+                assistantMessageId = event.messageId,
                 choices = event.choices,
             )
             is WorkshopAssistantStreamEvent.MetadataPatch -> updateAssistantMetadata(
-                assistantMessageId = assistantMessageId,
+                assistantMessageId = event.messageId,
                 title = event.title,
                 badge = event.badge,
             )
             is WorkshopAssistantStreamEvent.Complete -> finalizeAssistantTurn(
                 generationId = generationId,
-                assistantMessageId = assistantMessageId,
+                assistantMessageId = event.messageId,
             )
             is WorkshopAssistantStreamEvent.AbortAck -> cleanupStreamingAssistant(
                 generationId = generationId,
+                assistantMessageId = event.messageId,
                 errorMessage = null,
             )
             is WorkshopAssistantStreamEvent.Error -> cleanupStreamingAssistant(
                 generationId = generationId,
+                assistantMessageId = event.messageId,
                 errorMessage = event.message,
             )
         }
@@ -311,12 +313,13 @@ class WorkshopViewModel(
 
     private fun cleanupStreamingAssistant(
         generationId: Int,
+        assistantMessageId: String?,
         errorMessage: String?,
     ) {
         if (activeGenerationId != generationId) return
-        if (errorMessage != null && !_state.value.isStreamingAssistant(activeAssistantMessageId)) return
+        if (activeAssistantMessageId != assistantMessageId) return
+        if (errorMessage != null && !_state.value.isStreamingAssistant(assistantMessageId)) return
 
-        val assistantMessageId = activeAssistantMessageId
         _state.update {
             it.copy(
                 messages = it.messages.filterNot { message ->
