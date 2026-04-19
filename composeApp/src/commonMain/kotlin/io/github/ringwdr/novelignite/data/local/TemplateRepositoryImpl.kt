@@ -123,6 +123,13 @@ class TemplateRepositoryImpl(
             .executeAsList()
             .map { it.toDomainModel(json) }
 
+    override suspend fun deleteTemplate(templateId: Long): Unit = withContext(Dispatchers.IO) {
+        database.transaction {
+            database.projectQueries.clearTemplateIdForTemplate(templateId)
+            database.templateQueries.deleteTemplateById(templateId)
+        }
+    }
+
     private fun insertTemplate(
         title: String,
         genre: String,

@@ -16,6 +16,11 @@ SELECT *
 FROM Project
 WHERE id = ?;
 
+clearTemplateIdForTemplate:
+UPDATE Project
+SET template_id = NULL
+WHERE template_id = ?;
+
 insertProject:
 INSERT INTO Project(
     title,

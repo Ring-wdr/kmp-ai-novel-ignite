@@ -28,28 +28,33 @@ class DraftSessionRepositoryImpl(
         content: String,
     ): DraftSession = withContext(Dispatchers.IO) {
         val now = Clock.System.now().toEpochMilliseconds()
-
-        if (sessionId == null) {
-            database.draftSessionQueries.insertDraftSession(
-                project_id = projectId,
-                content = content,
-                created_at_epoch_ms = now,
-                updated_at_epoch_ms = now,
-            )
-            val draftSessionId = database.draftSessionQueries.lastInsertedDraftSessionRowId()
-                .executeAsOne()
-            database.draftSessionQueries.selectDraftSessionById(draftSessionId)
-                .executeAsOne()
-                .toDomainModel()
-        } else {
-            database.draftSessionQueries.updateDraftSessionContentById(
-                content = content,
-                updated_at_epoch_ms = now,
-                id = sessionId,
-            )
-            database.draftSessionQueries.selectDraftSessionById(sessionId)
-                .executeAsOne()
-                .toDomainModel()
+        database.transactionWithResult {
+            if (sessionId == null) {
+                database.draftSessionQueries.insertDraftSession(
+                    project_id = projectId,
+                    content = content,
+                    created_at_epoch_ms = now,
+                    updated_at_epoch_ms = now,
+                )
+                val draftSessionId = database.draftSessionQueries.lastInsertedDraftSessionRowId()
+                    .executeAsOne()
+                database.draftSessionQueries.selectDraftSessionById(draftSessionId)
+                    .executeAsOneOrNull()
+                    ?.toDomainModel()
+                    ?: database.draftSessionQueries.selectLatestDraftSessionByProjectId(projectId)
+                        .executeAsOne()
+                        .toDomainModel()
+            } else {
+                database.draftSessionQueries.updateDraftSessionContentById(
+                    content = content,
+                    updated_at_epoch_ms = now,
+                    id = sessionId,
+                )
+                database.draftSessionQueries.selectDraftSessionById(sessionId)
+                    .executeAsOneOrNull()
+                    ?.toDomainModel()
+                    ?: error("Draft session $sessionId not found after update")
+            }
         }
     }
 }

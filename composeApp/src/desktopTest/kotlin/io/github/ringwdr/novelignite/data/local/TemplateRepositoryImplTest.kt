@@ -2,6 +2,7 @@ package io.github.ringwdr.novelignite.data.local
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlinx.coroutines.test.runTest
 
 class TemplateRepositoryImplTest {
@@ -129,5 +130,54 @@ class TemplateRepositoryImplTest {
         assertEquals(listOf(2L, 1L), versions.map { it.version_number })
         assertEquals("Noir Seoul Revised", versions.first().title)
         assertEquals("Noir Seoul", versions.last().title)
+    }
+
+    @Test
+    fun deleteTemplate_removesTemplateHistory_andClearsProjectReference() = runTest {
+        val database = TestDatabaseFactory.create()
+        val repository = TemplateRepositoryImpl(database)
+
+        val created = repository.saveTemplate(
+            title = "Noir Seoul",
+            genre = "Urban Fantasy",
+            premise = "A ghost broker solves debts",
+            worldSetting = "Night markets and hidden contracts",
+            characterCards = "Jin, Hyeon, Broker",
+            relationshipNotes = "Debt binds broker and ghost",
+            toneStyle = "Moody and elegant",
+            bannedElements = "No slapstick",
+            plotConstraints = "Reveal one secret per scene",
+            openingHook = "Rain on neon stone",
+            promptBlocks = listOf("Keep sensory detail high"),
+        )
+
+        repository.saveTemplate(
+            title = "Noir Seoul Revised",
+            genre = "Urban Fantasy",
+            premise = "A ghost broker negotiates a deeper debt",
+            worldSetting = "Night markets and hidden contracts",
+            characterCards = "Jin, Hyeon, Broker",
+            relationshipNotes = "Debt binds broker and ghost",
+            toneStyle = "Moody and elegant",
+            bannedElements = "No slapstick",
+            plotConstraints = "Reveal one secret per scene",
+            openingHook = "Rain on neon stone",
+            promptBlocks = listOf("Keep sensory detail high", "Keep dialogue sharp"),
+            templateId = created.id,
+        )
+
+        database.projectQueries.insertProject(
+            title = "Workshop: Noir Seoul",
+            template_id = created.id,
+            created_at_epoch_ms = 1L,
+            updated_at_epoch_ms = 1L,
+        )
+        val projectId = database.projectQueries.lastInsertedRowId().executeAsOne()
+
+        repository.deleteTemplate(created.id)
+
+        assertEquals(emptyList(), repository.listTemplates())
+        assertEquals(emptyList(), repository.listTemplateVersions(created.id))
+        assertNull(database.projectQueries.selectProjectById(projectId).executeAsOne().template_id)
     }
 }

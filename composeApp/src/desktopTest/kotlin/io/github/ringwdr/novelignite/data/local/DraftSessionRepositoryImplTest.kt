@@ -3,6 +3,10 @@ package io.github.ringwdr.novelignite.data.local
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 
 class DraftSessionRepositoryImplTest {
@@ -82,5 +86,69 @@ class DraftSessionRepositoryImplTest {
 
         assertEquals(latestFirst.content, latestByProject[firstProject.id]?.content)
         assertEquals(latestSecond.content, latestByProject[secondProject.id]?.content)
+    }
+
+    @Test
+    fun saveDraftSession_supportsConcurrentInsertsWithoutLosingInsertedRows() = runTest {
+        val database = TestDatabaseFactory.create()
+        val projectRepository = ProjectRepositoryImpl(database)
+        val draftSessionRepository = DraftSessionRepositoryImpl(database)
+        val project = projectRepository.createProject(title = "Concurrent Workshop Draft", templateId = null)
+
+        coroutineScope {
+            (1..40).map { index ->
+                async(Dispatchers.Default) {
+                    draftSessionRepository.saveDraftSession(
+                        projectId = project.id,
+                        sessionId = null,
+                        content = "Draft $index",
+                    )
+                }
+            }.awaitAll()
+        }
+
+        assertEquals(
+            40,
+            database.draftSessionQueries.selectDraftSessionsByProjectId(project.id)
+                .executeAsList()
+                .size,
+        )
+    }
+
+    @Test
+    fun saveDraftSession_remainsStableWhileOtherTablesInsertRowsConcurrently() = runTest {
+        val database = TestDatabaseFactory.create()
+        val projectRepository = ProjectRepositoryImpl(database)
+        val draftSessionRepository = DraftSessionRepositoryImpl(database)
+        val project = projectRepository.createProject(title = "Concurrent Workshop Draft", templateId = null)
+
+        coroutineScope {
+            val draftWrites = (1..40).map { index ->
+                async(Dispatchers.Default) {
+                    draftSessionRepository.saveDraftSession(
+                        projectId = project.id,
+                        sessionId = null,
+                        content = "Draft $index",
+                    )
+                }
+            }
+            val projectWrites = (1..40).map { index ->
+                async(Dispatchers.Default) {
+                    projectRepository.createProject(
+                        title = "Background Project $index",
+                        templateId = null,
+                    )
+                }
+            }
+
+            (draftWrites + projectWrites).awaitAll()
+        }
+
+        assertEquals(
+            40,
+            database.draftSessionQueries.selectDraftSessionsByProjectId(project.id)
+                .executeAsList()
+                .size,
+        )
     }
 }

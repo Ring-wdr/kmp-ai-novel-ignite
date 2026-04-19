@@ -74,6 +74,11 @@ internal object AndroidTemplateMemoryStore {
         )
         return saved
     }
+
+    fun delete(templateId: Long) {
+        templates.removeAll { it.id == templateId }
+        versionsByTemplateId.remove(templateId)
+    }
 }
 
 actual fun loadLocalTemplates(): List<Template> = AndroidTemplateMemoryStore.list()
@@ -136,3 +141,13 @@ actual suspend fun saveLocalTemplate(
         ),
     )
 }
+
+actual suspend fun deleteLocalTemplate(
+    templateId: Long,
+) {
+    AndroidTemplateMemoryStore.delete(templateId)
+}
+
+actual suspend fun enrichTemplateDraft(
+    draft: TemplateDraft,
+): TemplateDraft = buildFallbackEnrichedTemplateDraft(draft)

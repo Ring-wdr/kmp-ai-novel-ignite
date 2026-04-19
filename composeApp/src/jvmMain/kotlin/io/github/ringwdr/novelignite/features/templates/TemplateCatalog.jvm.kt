@@ -1,5 +1,6 @@
 package io.github.ringwdr.novelignite.features.templates
 
+import io.github.ringwdr.novelignite.data.inference.DesktopOllamaModelsClient
 import io.github.ringwdr.novelignite.data.local.TemplateRepositoryImpl
 import io.github.ringwdr.novelignite.data.local.openDesktopDatabase
 import io.github.ringwdr.novelignite.domain.model.Template
@@ -46,4 +47,23 @@ actual suspend fun saveLocalTemplate(
         promptBlocks = seed.promptBlocks,
         templateId = seed.templateId,
     )
+}
+
+actual suspend fun deleteLocalTemplate(
+    templateId: Long,
+) {
+    TemplateRepositoryImpl(
+        database = openDesktopDatabase(),
+    ).deleteTemplate(templateId)
+}
+
+actual suspend fun enrichTemplateDraft(
+    draft: TemplateDraft,
+): TemplateDraft {
+    val baseUrl = System.getenv("OLLAMA_BASE_URL")?.trim().orEmpty().ifBlank { "http://127.0.0.1:11434" }
+    val modelName = System.getenv("OLLAMA_MODEL")?.trim().orEmpty()
+        .ifBlank { "hf.co/TrevorJS/gemma-4-E4B-it-uncensored-GGUF:Q8_0" }
+    val raw = DesktopOllamaModelsClient(baseUrl = baseUrl)
+        .generate(model = modelName, prompt = buildTemplateEnrichmentPrompt(draft))
+    return parseTemplateEnrichmentResponse(raw = raw, original = draft)
 }

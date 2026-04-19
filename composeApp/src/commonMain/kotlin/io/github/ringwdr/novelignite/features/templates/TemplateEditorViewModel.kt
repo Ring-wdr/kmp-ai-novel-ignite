@@ -5,10 +5,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 data class TemplateDraft(
-    val title: String,
-    val genre: String,
-    val premise: String,
-    val promptBlocks: List<String>,
+    val title: String = "",
+    val genre: String = "",
+    val premise: String = "",
+    val promptBlocks: List<String> = emptyList(),
 )
 
 class TemplateEditorViewModel {
@@ -73,6 +73,12 @@ class TemplateEditorViewModel {
         }
     }
 
+    fun applyEnrichedDraft(draft: TemplateDraft) {
+        loadDraft(draft)
+    }
+
+    fun snapshotDraft(): TemplateDraft = state.value.toDraft()
+
     suspend fun saveTemplate(
         onSave: suspend (TemplateDraft) -> Template,
         resetAfterSave: Boolean = true,
@@ -97,3 +103,10 @@ class TemplateEditorViewModel {
         return savedTemplate
     }
 }
+
+private fun TemplateEditorState.toDraft(): TemplateDraft = TemplateDraft(
+    title = title,
+    genre = genre,
+    premise = premise,
+    promptBlocks = promptBlocks,
+)

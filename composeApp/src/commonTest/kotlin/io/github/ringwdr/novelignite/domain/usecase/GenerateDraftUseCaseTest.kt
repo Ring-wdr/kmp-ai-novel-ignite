@@ -15,6 +15,7 @@ class GenerateDraftUseCaseTest {
             projectId = "project-1",
             templateId = "template-1",
             actionType = "continue",
+            userPrompt = "",
             manuscriptExcerpt = "The gate opened.",
             promptBlocks = listOf("Keep it lyrical")
         )

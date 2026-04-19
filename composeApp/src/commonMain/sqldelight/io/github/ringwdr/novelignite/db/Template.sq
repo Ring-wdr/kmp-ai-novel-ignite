@@ -25,6 +25,10 @@ SELECT *
 FROM Template
 WHERE id = ?;
 
+deleteTemplateById:
+DELETE FROM Template
+WHERE id = ?;
+
 insertTemplate:
 INSERT INTO Template(
     title,

@@ -9,6 +9,7 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -220,5 +221,55 @@ class TemplateEditorCardTest {
         rule.runOnIdle {
             assertEquals("   ", promptText)
         }
+    }
+
+    @Test
+    fun rendersTemplateEnrichAction_whenSeedInputExists() {
+        rule.setContent {
+            TemplateEditorCard(
+                title = "New Template",
+                saveLabel = "Save",
+                state = TemplateEditorState(
+                    title = "Noir Seoul",
+                ),
+                promptBlockInput = TextFieldValue(""),
+                promptBlockErrorMessage = null,
+                onTitleChange = {},
+                onGenreChange = {},
+                onPremiseChange = {},
+                onPromptBlockInputChange = {},
+                onAddPromptBlock = {},
+                onPromptBlockChange = { _, _ -> },
+                onRemovePromptBlock = {},
+                onSaveTemplate = {},
+                onEnrichTemplate = {},
+            )
+        }
+
+        rule.onNodeWithText("Template enrich").assertExists()
+    }
+
+    @Test
+    fun enrichButton_disablesWhenNoSeedInput() {
+        rule.setContent {
+            TemplateEditorCard(
+                title = "New Template",
+                saveLabel = "Save",
+                state = TemplateEditorState(),
+                promptBlockInput = TextFieldValue(""),
+                promptBlockErrorMessage = null,
+                onTitleChange = {},
+                onGenreChange = {},
+                onPremiseChange = {},
+                onPromptBlockInputChange = {},
+                onAddPromptBlock = {},
+                onPromptBlockChange = { _, _ -> },
+                onRemovePromptBlock = {},
+                onSaveTemplate = {},
+                onEnrichTemplate = {},
+            )
+        }
+
+        rule.onNodeWithText("Template enrich").assertIsNotEnabled()
     }
 }

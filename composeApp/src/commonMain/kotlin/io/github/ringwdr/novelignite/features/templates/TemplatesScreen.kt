@@ -46,6 +46,10 @@ fun TemplatesScreen() {
     var detailPromptBlockInput by remember { mutableStateOf(TextFieldValue("")) }
     var newPromptBlockError by remember { mutableStateOf<String?>(null) }
     var detailPromptBlockError by remember { mutableStateOf<String?>(null) }
+    var newEnrichError by remember { mutableStateOf<String?>(null) }
+    var detailEnrichError by remember { mutableStateOf<String?>(null) }
+    var isEnrichingNewTemplate by remember { mutableStateOf(false) }
+    var isEnrichingDetailTemplate by remember { mutableStateOf(false) }
     var selectedTemplateId by remember { mutableStateOf<Long?>(null) }
     var remixBanner by remember { mutableStateOf<String?>(null) }
     var remixSourceVersion by remember { mutableStateOf<TemplateVersion?>(null) }
@@ -69,9 +73,11 @@ fun TemplatesScreen() {
         newTemplateEditorViewModel.loadDraft(selection.draft)
         newPromptBlockInput = TextFieldValue("")
         newPromptBlockError = null
+        newEnrichError = null
         selectedTemplateId = null
         detailPromptBlockInput = TextFieldValue("")
         detailPromptBlockError = null
+        detailEnrichError = null
         remixBanner = selection.sourceLabel
         remixSourceVersion = selection.sourceVersion
         TemplateRemixStore.clear()
@@ -154,6 +160,22 @@ fun TemplatesScreen() {
                     )
                 }
             },
+            onEnrichTemplate = {
+                scope.launch {
+                    isEnrichingNewTemplate = true
+                    newEnrichError = null
+                    runCatching {
+                        enrichTemplateDraft(newTemplateEditorViewModel.snapshotDraft())
+                    }.onSuccess { enriched ->
+                        newTemplateEditorViewModel.applyEnrichedDraft(enriched)
+                    }.onFailure { error ->
+                        newEnrichError = error.message ?: "Template enrichment failed."
+                    }
+                    isEnrichingNewTemplate = false
+                }
+            },
+            isEnriching = isEnrichingNewTemplate,
+            enrichErrorMessage = newEnrichError,
         )
 
         if (selectedTemplate != null) {
@@ -209,6 +231,22 @@ fun TemplatesScreen() {
                         }
                     }
                 },
+                onEnrichTemplate = {
+                    scope.launch {
+                        isEnrichingDetailTemplate = true
+                        detailEnrichError = null
+                        runCatching {
+                            enrichTemplateDraft(detailTemplateEditorViewModel.snapshotDraft())
+                        }.onSuccess { enriched ->
+                            detailTemplateEditorViewModel.applyEnrichedDraft(enriched)
+                        }.onFailure { error ->
+                            detailEnrichError = error.message ?: "Template enrichment failed."
+                        }
+                        isEnrichingDetailTemplate = false
+                    }
+                },
+                isEnriching = isEnrichingDetailTemplate,
+                enrichErrorMessage = detailEnrichError,
             )
 
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -248,6 +286,20 @@ fun TemplatesScreen() {
                             detailPromptBlockInput = TextFieldValue("")
                             detailPromptBlockError = null
                         },
+                        onDeleteTemplate = {
+                            scope.launch {
+                                deleteLocalTemplate(template.id)
+                                templates = loadLocalTemplates()
+                                if (activeTemplate?.id == template.id) {
+                                    ActiveWorkshopTemplateStore.clear()
+                                }
+                                if (selectedTemplateId == template.id) {
+                                    selectedTemplateId = null
+                                    detailPromptBlockInput = TextFieldValue("")
+                                    detailPromptBlockError = null
+                                }
+                            }
+                        },
                     )
                 }
             }
@@ -256,11 +308,12 @@ fun TemplatesScreen() {
 }
 
 @Composable
-private fun TemplateListItem(
+internal fun TemplateListItem(
     template: Template,
     isActive: Boolean,
     isSelected: Boolean,
     onOpenTemplate: () -> Unit,
+    onDeleteTemplate: () -> Unit = {},
 ) {
     Card(
         modifier = Modifier
@@ -291,14 +344,23 @@ private fun TemplateListItem(
                     fontWeight = FontWeight.Medium,
                 )
             }
-            Button(
-                onClick = {
-                    ActiveWorkshopTemplateStore.select(
-                        ActiveWorkshopTemplate(id = template.id, title = template.title)
-                    )
-                },
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(if (isActive) "Selected for Workshop" else "Use in Workshop")
+                Button(
+                    onClick = {
+                        ActiveWorkshopTemplateStore.select(
+                            ActiveWorkshopTemplate(id = template.id, title = template.title)
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (isActive) "Selected for Workshop" else "Use in Workshop")
+                }
+                OutlinedButton(onClick = onDeleteTemplate) {
+                    Text("Delete")
+                }
             }
         }
     }

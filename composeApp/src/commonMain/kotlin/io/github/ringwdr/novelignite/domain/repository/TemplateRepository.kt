@@ -24,4 +24,6 @@ interface TemplateRepository {
     fun listTemplateVersions(templateId: Long): List<TemplateVersion>
 
     fun listAllTemplateVersions(): List<TemplateVersion>
+
+    suspend fun deleteTemplate(templateId: Long)
 }

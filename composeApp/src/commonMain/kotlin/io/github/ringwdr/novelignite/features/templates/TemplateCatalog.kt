@@ -13,3 +13,11 @@ expect suspend fun saveLocalTemplate(
     originalTemplate: Template? = null,
     originalVersion: TemplateVersion? = null,
 ): Template
+
+expect suspend fun deleteLocalTemplate(
+    templateId: Long,
+)
+
+expect suspend fun enrichTemplateDraft(
+    draft: TemplateDraft,
+): TemplateDraft

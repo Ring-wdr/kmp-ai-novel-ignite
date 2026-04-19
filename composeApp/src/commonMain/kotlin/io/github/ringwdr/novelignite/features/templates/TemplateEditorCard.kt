@@ -50,6 +50,9 @@ internal fun TemplateEditorCard(
     onPromptBlockChange: (Int, String) -> Unit,
     onRemovePromptBlock: (Int) -> Unit,
     onSaveTemplate: () -> Unit,
+    onEnrichTemplate: () -> Unit = {},
+    isEnriching: Boolean = false,
+    enrichErrorMessage: String? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
@@ -116,7 +119,6 @@ internal fun TemplateEditorCard(
                     onClick = {
                         scope.launch {
                             focusManager.clearFocus(force = true)
-                            yield()
                             onAddPromptBlock()
                         }
                     },
@@ -147,6 +149,19 @@ internal fun TemplateEditorCard(
                     }
                 }
             }
+            OutlinedButton(
+                onClick = onEnrichTemplate,
+                enabled = !isEnriching && state.hasEnrichmentSeed(),
+            ) {
+                Text(if (isEnriching) "Template enriching..." else "Template enrich")
+            }
+            if (enrichErrorMessage != null) {
+                Text(
+                    text = enrichErrorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Button(
                 onClick = onSaveTemplate,
                 enabled = state.title.isNotBlank() &&
@@ -160,6 +175,12 @@ internal fun TemplateEditorCard(
         }
     }
 }
+
+private fun TemplateEditorState.hasEnrichmentSeed(): Boolean =
+    title.isNotBlank() ||
+        genre.isNotBlank() ||
+        premise.isNotBlank() ||
+        promptBlocks.any { it.isNotBlank() }
 
 private fun Modifier.moveFocusOnTab(focusManager: FocusManager): Modifier = onPreviewKeyEvent { event ->
     if (event.type != KeyEventType.KeyDown || event.key != Key.Tab) {

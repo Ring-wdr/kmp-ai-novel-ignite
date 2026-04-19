@@ -1,20 +1,26 @@
 package io.github.ringwdr.novelignite.features.workshop
 
+import io.github.ringwdr.novelignite.data.local.TemplateRepositoryImpl
 import io.github.ringwdr.novelignite.db.NovelIgniteDatabase
 import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
 import io.github.ringwdr.novelignite.data.local.DraftSessionRepositoryImpl
 import io.github.ringwdr.novelignite.data.local.openDesktopDatabase
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 private const val DefaultWorkshopProjectTitle = "Workshop Draft"
+private const val DefaultWorkshopTemplateId = "workshop-default-template"
 private val workshopStateJson = Json { ignoreUnknownKeys = true }
 
 actual fun createDefaultWorkshopViewModel(inferenceEngine: InferenceEngine): WorkshopViewModel {
     val database = openDesktopDatabase()
+    val activeTemplate = ActiveWorkshopTemplateStore.selection.value
     val project = ensureWorkshopProject(
         database = database,
-        activeTemplate = ActiveWorkshopTemplateStore.selection.value,
+        activeTemplate = activeTemplate,
+    )
+    val promptConfig = resolveWorkshopTemplatePromptConfig(
+        database = database,
+        activeTemplate = activeTemplate,
     )
     val repository = DraftSessionRepositoryImpl(database)
     val latestSession = repository.latestDraftSession(project.id)
@@ -26,6 +32,8 @@ actual fun createDefaultWorkshopViewModel(inferenceEngine: InferenceEngine): Wor
     return WorkshopViewModel(
         inferenceEngine = inferenceEngine,
         initialState = initialState,
+        templateId = promptConfig.templateId,
+        templatePromptBlocks = promptConfig.promptBlocks,
         persistState = { state ->
             val content = buildStoredContent(state)
             val saved = repository.saveDraftSession(
@@ -89,26 +97,52 @@ private fun io.github.ringwdr.novelignite.db.Project.toDomainModel(): io.github.
     )
 
 private fun buildStoredContent(state: WorkshopUiState): String =
-    workshopStateJson.encodeToString(StoredWorkshopState.from(state))
+    workshopStateJson.encodeToString(WorkshopStateSnapshot.from(state))
 
 private fun parseStoredState(content: String): WorkshopUiState =
-    runCatching { workshopStateJson.decodeFromString<StoredWorkshopState>(content).toUiState() }
+    runCatching { workshopStateJson.decodeFromString<WorkshopStateSnapshot>(content).toUiState() }
+        .recoverCatching {
+            workshopStateJson.decodeFromString<LegacyStoredWorkshopState>(content).toUiState()
+        }
         .getOrElse { WorkshopUiState(draftText = content) }
 
-@Serializable
-private data class StoredWorkshopState(
+@kotlinx.serialization.Serializable
+private data class LegacyStoredWorkshopState(
     val draftText: String,
     val generatedText: String = "",
 ) {
     fun toUiState(): WorkshopUiState = WorkshopUiState(
         draftText = draftText,
-        generatedText = generatedText,
+        messages = generatedText.takeIf { it.isNotBlank() }
+            ?.let { listOf(WorkshopChatMessage.assistant("legacy-generated", it)) }
+            ?: emptyList(),
+        streamingStatus = WorkshopStreamingStatus.Idle,
+        errorMessage = null,
     )
+}
 
-    companion object {
-        fun from(state: WorkshopUiState): StoredWorkshopState = StoredWorkshopState(
-            draftText = state.draftText,
-            generatedText = state.generatedText,
+internal data class WorkshopTemplatePromptConfig(
+    val templateId: String,
+    val promptBlocks: List<String>,
+)
+
+internal fun resolveWorkshopTemplatePromptConfig(
+    database: NovelIgniteDatabase,
+    activeTemplate: ActiveWorkshopTemplate?,
+): WorkshopTemplatePromptConfig {
+    if (activeTemplate == null) {
+        return WorkshopTemplatePromptConfig(
+            templateId = DefaultWorkshopTemplateId,
+            promptBlocks = emptyList(),
         )
     }
+
+    val template = TemplateRepositoryImpl(database)
+        .listTemplates()
+        .firstOrNull { candidate -> candidate.id == activeTemplate.id }
+
+    return WorkshopTemplatePromptConfig(
+        templateId = activeTemplate.id.toString(),
+        promptBlocks = template?.promptBlocks.orEmpty(),
+    )
 }

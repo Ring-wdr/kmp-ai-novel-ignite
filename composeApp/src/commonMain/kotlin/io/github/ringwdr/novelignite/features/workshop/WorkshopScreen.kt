@@ -43,9 +43,14 @@ fun WorkshopScreen(
             style = MaterialTheme.typography.bodyMedium,
         )
         ChatPanel(
-            generatedText = state.generatedText,
-            isGenerating = state.isGenerating,
+            messages = state.messages,
+            chatInputText = state.chatInputText,
+            streamingStatus = state.streamingStatus,
+            errorMessage = state.errorMessage,
+            onChatInputChange = activeViewModel::updateChatInput,
+            onSendChatMessage = activeViewModel::sendChatMessage,
             onContinueScene = activeViewModel::continueScene,
+            onAbortGeneration = activeViewModel::abortGeneration,
         )
         ManuscriptEditor(
             text = state.draftText,
