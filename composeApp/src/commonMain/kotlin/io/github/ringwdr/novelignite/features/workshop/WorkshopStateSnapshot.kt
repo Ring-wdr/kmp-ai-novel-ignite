@@ -43,10 +43,29 @@ private fun List<WorkshopPersistedMessage>.toUiMessages(): List<WorkshopChatMess
         val normalizedId = if (seenIds.add(message.id)) {
             message.id
         } else {
-            "restored-message-${index + 1}-${message.role.name.lowercase()}"
+            nextUniqueRestoredId(
+                index = index,
+                role = message.role,
+                seenIds = seenIds,
+            )
         }
         message.toUiMessage(id = normalizedId)
     }
+}
+
+private fun nextUniqueRestoredId(
+    index: Int,
+    role: WorkshopMessageRole,
+    seenIds: MutableSet<String>,
+): String {
+    val baseId = "restored-message-${index + 1}-${role.name.lowercase()}"
+    var candidate = baseId
+    var attempt = 2
+    while (!seenIds.add(candidate)) {
+        candidate = "$baseId-$attempt"
+        attempt += 1
+    }
+    return candidate
 }
 
 private fun WorkshopPersistedMessage.toUiMessage(id: String): WorkshopChatMessage =

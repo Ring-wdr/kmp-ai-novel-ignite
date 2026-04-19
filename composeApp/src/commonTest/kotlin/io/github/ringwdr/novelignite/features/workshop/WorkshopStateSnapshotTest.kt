@@ -152,6 +152,42 @@ class WorkshopStateSnapshotTest {
     }
 
     @Test
+    fun toUiState_reassignsDuplicateIdsEvenWhenFallbackPatternAlreadyExists() {
+        val snapshot = WorkshopStateSnapshot(
+            draftText = "Saved draft",
+            messages = listOf(
+                WorkshopPersistedMessage(
+                    id = "restored-message-3-user",
+                    role = WorkshopMessageRole.User,
+                    text = "Existing fallback id",
+                ),
+                WorkshopPersistedMessage(
+                    id = "generation-1-user",
+                    role = WorkshopMessageRole.User,
+                    text = "Hello",
+                ),
+                WorkshopPersistedMessage(
+                    id = "generation-1-user",
+                    role = WorkshopMessageRole.User,
+                    text = "Hello again",
+                ),
+            ),
+        )
+
+        val restored = snapshot.toUiState()
+
+        assertEquals(
+            listOf(
+                "restored-message-3-user",
+                "generation-1-user",
+                "restored-message-3-user-2",
+            ),
+            restored.messages.map(WorkshopChatMessage::id),
+        )
+        assertEquals(3, restored.messages.map(WorkshopChatMessage::id).toSet().size)
+    }
+
+    @Test
     fun uiState_isGeneratingFollowsStreamingStatus() {
         val state = WorkshopUiState(
             streamingStatus = WorkshopStreamingStatus.Streaming,
