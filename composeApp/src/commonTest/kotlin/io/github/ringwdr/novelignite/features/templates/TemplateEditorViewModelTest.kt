@@ -10,9 +10,22 @@ class TemplateEditorViewModelTest {
     fun addPromptBlock_appendsFreeformRule() {
         val viewModel = TemplateEditorViewModel()
 
-        viewModel.addPromptBlock("Keep sensory detail high")
+        val added = viewModel.addPromptBlock("Keep sensory detail high")
 
+        assertEquals(true, added)
         assertEquals(listOf("Keep sensory detail high"), viewModel.state.value.promptBlocks)
+    }
+
+    @Test
+    fun addPromptBlock_returnsFalseForBlankInput_andKeepsStateUntouched() {
+        val viewModel = TemplateEditorViewModel()
+
+        viewModel.updateTitle("Noir Seoul")
+        val added = viewModel.addPromptBlock("   ")
+
+        assertEquals(false, added)
+        assertEquals("Noir Seoul", viewModel.state.value.title)
+        assertEquals(emptyList(), viewModel.state.value.promptBlocks)
     }
 
     @Test

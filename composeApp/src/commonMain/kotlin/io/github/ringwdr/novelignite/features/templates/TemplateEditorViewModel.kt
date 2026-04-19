@@ -46,10 +46,11 @@ class TemplateEditorViewModel {
         state.update { it.copy(premise = value) }
     }
 
-    fun addPromptBlock(value: String) {
+    fun addPromptBlock(value: String): Boolean {
         val sanitized = value.trim()
-        if (sanitized.isBlank()) return
+        if (sanitized.isBlank()) return false
         state.update { it.copy(promptBlocks = it.promptBlocks + sanitized) }
+        return true
     }
 
     fun updatePromptBlock(index: Int, value: String) {

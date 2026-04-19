@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.ringwdr.novelignite.domain.model.Template
 import io.github.ringwdr.novelignite.domain.model.TemplateVersion
@@ -41,8 +42,10 @@ fun TemplatesScreen() {
     val detailTemplateEditorViewModel = remember { TemplateEditorViewModel() }
     val detailTemplateEditorState by detailTemplateEditorViewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
-    var newPromptBlockInput by remember { mutableStateOf("") }
-    var detailPromptBlockInput by remember { mutableStateOf("") }
+    var newPromptBlockInput by remember { mutableStateOf(TextFieldValue("")) }
+    var detailPromptBlockInput by remember { mutableStateOf(TextFieldValue("")) }
+    var newPromptBlockError by remember { mutableStateOf<String?>(null) }
+    var detailPromptBlockError by remember { mutableStateOf<String?>(null) }
     var selectedTemplateId by remember { mutableStateOf<Long?>(null) }
     var remixBanner by remember { mutableStateOf<String?>(null) }
     var remixSourceVersion by remember { mutableStateOf<TemplateVersion?>(null) }
@@ -64,9 +67,11 @@ fun TemplatesScreen() {
     LaunchedEffect(remixSelection) {
         val selection = remixSelection ?: return@LaunchedEffect
         newTemplateEditorViewModel.loadDraft(selection.draft)
-        newPromptBlockInput = ""
+        newPromptBlockInput = TextFieldValue("")
+        newPromptBlockError = null
         selectedTemplateId = null
-        detailPromptBlockInput = ""
+        detailPromptBlockInput = TextFieldValue("")
+        detailPromptBlockError = null
         remixBanner = selection.sourceLabel
         remixSourceVersion = selection.sourceVersion
         TemplateRemixStore.clear()
@@ -110,13 +115,22 @@ fun TemplatesScreen() {
             saveLabel = "Save and Use in Workshop",
             state = newTemplateEditorState,
             promptBlockInput = newPromptBlockInput,
+            promptBlockErrorMessage = newPromptBlockError,
             onTitleChange = newTemplateEditorViewModel::updateTitle,
             onGenreChange = newTemplateEditorViewModel::updateGenre,
             onPremiseChange = newTemplateEditorViewModel::updatePremise,
-            onPromptBlockInputChange = { newPromptBlockInput = it },
+            onPromptBlockInputChange = {
+                newPromptBlockInput = it
+                newPromptBlockError = null
+            },
             onAddPromptBlock = {
-                newTemplateEditorViewModel.addPromptBlock(newPromptBlockInput)
-                newPromptBlockInput = ""
+                val added = newTemplateEditorViewModel.addPromptBlock(newPromptBlockInput.text)
+                if (added) {
+                    newPromptBlockInput = TextFieldValue("")
+                    newPromptBlockError = null
+                } else {
+                    newPromptBlockError = "Add a prompt block before continuing."
+                }
             },
             onPromptBlockChange = newTemplateEditorViewModel::updatePromptBlock,
             onRemovePromptBlock = newTemplateEditorViewModel::removePromptBlock,
@@ -148,13 +162,22 @@ fun TemplatesScreen() {
                 saveLabel = "Save Changes",
                 state = detailTemplateEditorState,
                 promptBlockInput = detailPromptBlockInput,
+                promptBlockErrorMessage = detailPromptBlockError,
                 onTitleChange = detailTemplateEditorViewModel::updateTitle,
                 onGenreChange = detailTemplateEditorViewModel::updateGenre,
                 onPremiseChange = detailTemplateEditorViewModel::updatePremise,
-                onPromptBlockInputChange = { detailPromptBlockInput = it },
+                onPromptBlockInputChange = {
+                    detailPromptBlockInput = it
+                    detailPromptBlockError = null
+                },
                 onAddPromptBlock = {
-                    detailTemplateEditorViewModel.addPromptBlock(detailPromptBlockInput)
-                    detailPromptBlockInput = ""
+                    val added = detailTemplateEditorViewModel.addPromptBlock(detailPromptBlockInput.text)
+                    if (added) {
+                        detailPromptBlockInput = TextFieldValue("")
+                        detailPromptBlockError = null
+                    } else {
+                        detailPromptBlockError = "Add a prompt block before continuing."
+                    }
                 },
                 onPromptBlockChange = detailTemplateEditorViewModel::updatePromptBlock,
                 onRemovePromptBlock = detailTemplateEditorViewModel::removePromptBlock,
@@ -174,7 +197,8 @@ fun TemplatesScreen() {
                         templates = loadLocalTemplates()
                         selectedTemplateId = savedTemplate.id
                         detailTemplateEditorViewModel.loadTemplate(savedTemplate)
-                        detailPromptBlockInput = ""
+                        detailPromptBlockInput = TextFieldValue("")
+                        detailPromptBlockError = null
                         if (activeTemplate?.id == savedTemplate.id) {
                             ActiveWorkshopTemplateStore.select(
                                 ActiveWorkshopTemplate(
@@ -221,7 +245,8 @@ fun TemplatesScreen() {
                         onOpenTemplate = {
                             selectedTemplateId = template.id
                             detailTemplateEditorViewModel.loadTemplate(template)
-                            detailPromptBlockInput = ""
+                            detailPromptBlockInput = TextFieldValue("")
+                            detailPromptBlockError = null
                         },
                     )
                 }

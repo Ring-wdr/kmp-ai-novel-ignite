@@ -56,6 +56,8 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(libs.kotlin.testJunit)
+            implementation(compose.desktop.uiTestJUnit4)
+            implementation(compose.desktop.currentOs)
             implementation("app.cash.sqldelight:sqlite-driver:2.2.1")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
