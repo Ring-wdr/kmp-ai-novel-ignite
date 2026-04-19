@@ -53,7 +53,7 @@ class WorkshopViewModelFactoryLegacyMigrationTest {
                       "badge": "Completed"
                     },
                     "phase": "Paused",
-                    "failureMessage": null
+                    "failureMessage": "stale failure"
                   }
                 },
                 {
@@ -89,6 +89,7 @@ class WorkshopViewModelFactoryLegacyMigrationTest {
                             badge = "Completed",
                         ),
                         phase = WorkshopAssistantPhase.Completed,
+                        failureMessage = null,
                     ),
                 ),
                 WorkshopChatMessage.assistant(

@@ -164,7 +164,7 @@ private fun JsonElement?.toWorkshopAssistantOrNull(fallbackMarkdown: String): Wo
         choices = objectElement["choices"].toWorkshopChoices(),
         metadata = objectElement["metadata"].toWorkshopAssistantMetadata(),
         phase = WorkshopAssistantPhase.Completed,
-        failureMessage = objectElement["failureMessage"].stringValueOrEmpty().takeIf { it.isNotBlank() },
+        failureMessage = null,
     )
 }
 
