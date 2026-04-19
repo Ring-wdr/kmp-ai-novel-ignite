@@ -46,6 +46,15 @@ class DefaultWorkshopAssistantStreamSource(
 
                 is GenerationEvent.Final -> {
                     val finalMarkdown = event.text.ifBlank { streamedMarkdown.toString() }
+                    if (finalMarkdown.isBlank()) {
+                        emit(
+                            WorkshopAssistantStreamEvent.Error(
+                                messageId = messageId,
+                                message = "Generation returned no content.",
+                            )
+                        )
+                        return@collect
+                    }
                     val finalDelta = when {
                         streamedMarkdown.isEmpty() -> null
                         finalMarkdown.startsWith(streamedMarkdown.toString()) ->

@@ -14,6 +14,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -196,6 +197,36 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun sendChatMessage_blankFinalOutputRemovesAssistantAndSurfacesError() = runTest {
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(
+                    WorkshopAssistantStreamEvent.Complete(
+                        messageId = messageId,
+                        finalMarkdown = "",
+                    )
+                )
+            },
+        )
+
+        viewModel.updateChatInput("Continue the scene")
+        viewModel.sendChatMessage()
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                WorkshopChatMessage.user(id = "generation-1-user", text = "Continue the scene"),
+            ),
+            viewModel.state.value.messages,
+        )
+        assertEquals("Generation returned no content.", viewModel.state.value.errorMessage)
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
+    }
+
+    @Test
     fun sendChatMessage_replacesStreamedMarkdownWithAuthoritativeFinalMarkdown() = runTest {
         val viewModel = newViewModel(
             testScheduler = testScheduler,
@@ -274,6 +305,56 @@ class WorkshopViewModelTest {
         )
         assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
         assertNull(viewModel.state.value.errorMessage)
+    }
+
+    @Test
+    fun wrongTerminalId_doesNotStrandStreamingAssistantWhenCollectorFinishes() = runTest {
+        val requests = mutableListOf<GenerationRequest>()
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = recordingSource(requests) { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                if (requests.size == 1) {
+                    emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                    emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "Draft"))
+                    emit(WorkshopAssistantStreamEvent.Complete("generation-999-assistant"))
+                } else {
+                    emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                    emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "Recovered"))
+                    emit(WorkshopAssistantStreamEvent.Complete(messageId))
+                }
+            },
+        )
+
+        viewModel.updateChatInput("First")
+        viewModel.sendChatMessage()
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                WorkshopChatMessage.user(id = "generation-1-user", text = "First"),
+            ),
+            viewModel.state.value.messages,
+        )
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
+
+        viewModel.continueScene()
+        runCurrent()
+
+        assertEquals(2, requests.size)
+        assertEquals(
+            listOf(
+                WorkshopChatMessage.user(id = "generation-1-user", text = "First"),
+                WorkshopChatMessage.user(id = "generation-2-user", text = "Continue scene"),
+                WorkshopChatMessage.assistant(
+                    id = "generation-2-assistant",
+                    text = "Recovered",
+                    isStreaming = false,
+                ),
+            ),
+            viewModel.state.value.messages,
+        )
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
     }
 
     @Test
@@ -437,6 +518,7 @@ class WorkshopViewModelTest {
             streamSource = recordingSource(requests) { _, generationId ->
                 val messageId = workshopGenerationAssistantMessageId(generationId)
                 emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "done"))
                 emit(WorkshopAssistantStreamEvent.Complete(messageId))
                 withContext(NonCancellable) {
                     release.receive()
@@ -457,7 +539,7 @@ class WorkshopViewModelTest {
                 WorkshopChatMessage.user(id = "generation-1-user", text = "Continue scene"),
                 WorkshopChatMessage.assistant(
                     id = "generation-1-assistant",
-                    text = "",
+                    text = "done",
                     isStreaming = false,
                 ),
             ),
@@ -474,7 +556,7 @@ class WorkshopViewModelTest {
                 WorkshopChatMessage.user(id = "generation-1-user", text = "Continue scene"),
                 WorkshopChatMessage.assistant(
                     id = "generation-1-assistant",
-                    text = "",
+                    text = "done",
                     isStreaming = false,
                 ),
             ),
@@ -763,6 +845,35 @@ class WorkshopViewModelTest {
         assertEquals(listOf("second"), persistedDrafts)
         assertEquals(null, viewModel.state.value.errorMessage)
         viewModel.clear()
+    }
+
+    @Test
+    fun clear_retriesRetainedLatestSnapshotAfterTransientPersistenceFailure() = runTest {
+        val persistedDrafts = mutableListOf<String>()
+        val firstFailureObserved = Channel<Unit>(capacity = 1)
+        var shouldFail = true
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, _ -> },
+            persistState = { state ->
+                if (shouldFail) {
+                    shouldFail = false
+                    firstFailureObserved.send(Unit)
+                    throw IllegalStateException("boom")
+                }
+                persistedDrafts += state.draftText
+            },
+            persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
+
+        viewModel.updateDraft("retry me")
+        withTimeout(5_000) {
+            firstFailureObserved.receive()
+        }
+
+        viewModel.clear()
+        assertEquals(listOf("retry me"), persistedDrafts)
+        assertEquals(null, viewModel.state.value.errorMessage)
     }
 
     @Test

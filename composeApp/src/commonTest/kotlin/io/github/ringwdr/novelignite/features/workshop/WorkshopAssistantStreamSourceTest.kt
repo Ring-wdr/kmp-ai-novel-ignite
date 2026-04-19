@@ -135,7 +135,7 @@ class WorkshopAssistantStreamSourceTest {
     }
 
     @Test
-    fun defaultSource_doesNotEmitChoicesWhenAuthoritativeFinalMarkdownIsBlank() = runTest {
+    fun defaultSource_emitsErrorInsteadOfChoicesWhenAuthoritativeFinalMarkdownIsBlank() = runTest {
         val source = DefaultWorkshopAssistantStreamSource(
             inferenceEngine = object : InferenceEngine {
                 override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
@@ -158,7 +158,7 @@ class WorkshopAssistantStreamSourceTest {
         ).toList()
 
         assertTrue(events.none { it is WorkshopAssistantStreamEvent.ChoicesReplace })
-        val complete = events.last() as WorkshopAssistantStreamEvent.Complete
-        assertEquals("", complete.finalMarkdown)
+        val error = events.last() as WorkshopAssistantStreamEvent.Error
+        assertEquals("Generation returned no content.", error.message)
     }
 }

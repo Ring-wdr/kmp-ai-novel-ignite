@@ -32,6 +32,7 @@ class WorkshopViewModel(
     private var activeAssistantMessageId: String? = null
     private var activeGenerationJob: Job? = null
     private var persistenceErrorMessage: String? = null
+    private var retainedPersistenceSnapshot: WorkshopUiState? = null
     private val persistQueue = Channel<WorkshopUiState>(capacity = Channel.CONFLATED)
     private val persistenceConsumerJob: Job
     val state: StateFlow<WorkshopUiState> = _state
@@ -41,8 +42,12 @@ class WorkshopViewModel(
             for (snapshot in persistQueue) {
                 try {
                     persistState(snapshot)
+                    if (retainedPersistenceSnapshot == snapshot) {
+                        retainedPersistenceSnapshot = null
+                    }
                     clearPersistenceFailure()
                 } catch (_: Throwable) {
+                    retainedPersistenceSnapshot = snapshot
                     surfacePersistenceFailure()
                 }
             }
@@ -90,6 +95,9 @@ class WorkshopViewModel(
         persistQueue.close()
         runBlocking {
             persistenceConsumerJob.join()
+            retainedPersistenceSnapshot?.let { snapshot ->
+                retryRetainedPersistenceSnapshot(snapshot)
+            }
         }
         activePersistenceScope.cancel()
     }
@@ -154,6 +162,12 @@ class WorkshopViewModel(
                     }
                 }
             } finally {
+                activeAssistantMessageId?.let { assistantMessageId ->
+                    applyAssistantStreamEvent(
+                        event = WorkshopAssistantStreamEvent.AbortAck(messageId = assistantMessageId),
+                        persistAfter = true,
+                    )
+                }
                 activeGenerationJob = null
                 activeGenerationId = 0
                 activeAssistantMessageId = null
@@ -169,7 +183,9 @@ class WorkshopViewModel(
     }
 
     private fun persistCurrentState() {
-        persistQueue.trySend(_state.value)
+        val snapshot = _state.value
+        retainedPersistenceSnapshot = snapshot
+        persistQueue.trySend(snapshot)
     }
 
     private fun surfacePersistenceFailure() {
@@ -188,6 +204,19 @@ class WorkshopViewModel(
             } else {
                 current
             }
+        }
+    }
+
+    private suspend fun retryRetainedPersistenceSnapshot(snapshot: WorkshopUiState) {
+        try {
+            persistState(snapshot)
+            if (retainedPersistenceSnapshot == snapshot) {
+                retainedPersistenceSnapshot = null
+            }
+            clearPersistenceFailure()
+        } catch (_: Throwable) {
+            retainedPersistenceSnapshot = snapshot
+            surfacePersistenceFailure()
         }
     }
 
@@ -223,22 +252,42 @@ class WorkshopViewModel(
         var changed = false
         _state.update { current ->
             val reduced = WorkshopAssistantStreamReducer.apply(current, event)
-            if (reduced == current) {
+            val sanitized = when {
+                event is WorkshopAssistantStreamEvent.Complete && reduced != current -> {
+                    val completedAssistant = reduced.messages
+                        .firstOrNull { message -> message.id == event.messageId }
+                        ?.assistant
+                    if (completedAssistant?.renderedMarkdown.isNullOrBlank()) {
+                        WorkshopAssistantStreamReducer.apply(
+                            current,
+                            WorkshopAssistantStreamEvent.Error(
+                                messageId = event.messageId,
+                                message = BlankAssistantFailureMessage,
+                            )
+                        )
+                    } else {
+                        reduced
+                    }
+                }
+
+                else -> reduced
+            }
+            if (sanitized == current) {
                 current
             } else {
                 changed = true
                 when (event) {
-                    is WorkshopAssistantStreamEvent.Start -> reduced.copy(
+                    is WorkshopAssistantStreamEvent.Start -> sanitized.copy(
                         errorMessage = persistenceErrorMessage,
                     )
 
                     is WorkshopAssistantStreamEvent.Complete,
                     is WorkshopAssistantStreamEvent.AbortAck,
-                    is WorkshopAssistantStreamEvent.Error -> reduced.copy(
+                    is WorkshopAssistantStreamEvent.Error -> sanitized.copy(
                         streamingStatus = WorkshopStreamingStatus.Recovering,
                     )
 
-                    else -> reduced
+                    else -> sanitized
                 }
             }
         }
@@ -249,6 +298,7 @@ class WorkshopViewModel(
 }
 
 private const val PersistenceFailureMessage = "Failed to save workshop changes."
+private const val BlankAssistantFailureMessage = "Generation returned no content."
 
 private fun defaultWorkshopScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
