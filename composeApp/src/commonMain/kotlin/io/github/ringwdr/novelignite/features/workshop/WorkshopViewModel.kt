@@ -168,7 +168,16 @@ class WorkshopViewModel(
             it.copy(
                 messages = it.messages.map { message ->
                     if (message.id == assistantMessageId && message.isStreaming) {
-                        message.copy(text = message.text + token, isStreaming = true)
+                        val renderedMarkdown = (message.assistant?.renderedMarkdown ?: message.text) + token
+                        message.copy(
+                            text = renderedMarkdown,
+                            assistant = (message.assistant ?: WorkshopAssistantTurn()).copy(
+                                renderedMarkdown = renderedMarkdown,
+                                phase = WorkshopAssistantPhase.Streaming,
+                                failureMessage = null,
+                            ),
+                            isStreaming = true,
+                        )
                     } else {
                         message
                     }
@@ -189,7 +198,15 @@ class WorkshopViewModel(
             it.copy(
                 messages = it.messages.map { message ->
                     if (message.id == assistantMessageId) {
-                        message.copy(text = finalText, isStreaming = false)
+                        message.copy(
+                            text = finalText,
+                            assistant = (message.assistant ?: WorkshopAssistantTurn()).copy(
+                                renderedMarkdown = finalText,
+                                phase = WorkshopAssistantPhase.Completed,
+                                failureMessage = null,
+                            ),
+                            isStreaming = false,
+                        )
                     } else {
                         message
                     }

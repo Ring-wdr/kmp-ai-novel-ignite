@@ -19,7 +19,8 @@ enum class WorkshopStreamingStatus {
 data class WorkshopChatMessage(
     val id: String,
     val role: WorkshopMessageRole,
-    val text: String,
+    val text: String = "",
+    val assistant: WorkshopAssistantTurn? = null,
     val isStreaming: Boolean = false,
 ) {
     companion object {
@@ -35,6 +36,10 @@ data class WorkshopChatMessage(
                 id = id,
                 role = WorkshopMessageRole.Assistant,
                 text = text,
+                assistant = WorkshopAssistantTurn(
+                    renderedMarkdown = text,
+                    phase = if (isStreaming) WorkshopAssistantPhase.Streaming else WorkshopAssistantPhase.Completed,
+                ),
                 isStreaming = isStreaming,
             )
     }

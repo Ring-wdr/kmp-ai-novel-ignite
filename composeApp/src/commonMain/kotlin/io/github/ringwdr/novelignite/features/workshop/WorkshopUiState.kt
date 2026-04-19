@@ -12,4 +12,7 @@ val WorkshopUiState.isGenerating: Boolean
     get() = streamingStatus == WorkshopStreamingStatus.Streaming
 
 val WorkshopUiState.latestAssistantText: String
-    get() = messages.lastOrNull { it.role == WorkshopMessageRole.Assistant && !it.isStreaming }?.text.orEmpty()
+    get() = messages.lastOrNull { it.role == WorkshopMessageRole.Assistant && !it.isStreaming }
+        ?.assistant
+        ?.renderedMarkdown
+        ?: messages.lastOrNull { it.role == WorkshopMessageRole.Assistant && !it.isStreaming }?.text.orEmpty()
