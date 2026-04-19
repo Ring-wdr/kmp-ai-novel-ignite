@@ -43,6 +43,7 @@ internal data class TemplatesScreenState(
 
     fun onSaveSuccess(savedTemplateId: Long, message: String): TemplatesScreenState = copy(
         surface = TemplatesSurface.List,
+        editorMode = TemplateEditorMode.Create,
         editingTemplateId = null,
         remixBanner = null,
         highlightedTemplateId = savedTemplateId,
@@ -51,6 +52,7 @@ internal data class TemplatesScreenState(
 
     fun onDeleteSuccess(message: String): TemplatesScreenState = copy(
         surface = TemplatesSurface.List,
+        editorMode = TemplateEditorMode.Create,
         editingTemplateId = null,
         remixBanner = null,
         highlightedTemplateId = null,
