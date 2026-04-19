@@ -57,14 +57,26 @@ private fun ensureWorkshopProject(
     }
 
     val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
-    database.projectQueries.insertProject(
-        title = projectTitle,
-        template_id = activeTemplate?.id,
-        created_at_epoch_ms = now,
-        updated_at_epoch_ms = now,
-    )
-    val projectId = database.projectQueries.lastInsertedRowId().executeAsOne()
-    return database.projectQueries.selectProjectById(projectId).executeAsOne().toDomainModel()
+    return database.transactionWithResult {
+        database.projectQueries.insertProject(
+            title = projectTitle,
+            template_id = activeTemplate?.id,
+            created_at_epoch_ms = now,
+            updated_at_epoch_ms = now,
+        )
+        val projectId = database.projectQueries.lastInsertedRowId().executeAsOne()
+        database.projectQueries.selectProjectById(projectId)
+            .executeAsOneOrNull()
+            ?.toDomainModel()
+            ?: database.projectQueries.selectAllProjects()
+                .executeAsList()
+                .first { project ->
+                    project.title == projectTitle &&
+                        project.template_id == activeTemplate?.id &&
+                        project.created_at_epoch_ms == now
+                }
+                .toDomainModel()
+    }
 }
 
 private fun io.github.ringwdr.novelignite.db.Project.toDomainModel(): io.github.ringwdr.novelignite.domain.model.Project =

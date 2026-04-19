@@ -13,19 +13,28 @@ class ProjectRepositoryImpl(
 ) : ProjectRepository {
     override suspend fun createProject(title: String, templateId: Long?): Project = withContext(Dispatchers.IO) {
         val now = Clock.System.now().toEpochMilliseconds()
+        database.transactionWithResult {
+            database.projectQueries.insertProject(
+                title = title,
+                template_id = templateId,
+                created_at_epoch_ms = now,
+                updated_at_epoch_ms = now,
+            )
 
-        database.projectQueries.insertProject(
-            title = title,
-            template_id = templateId,
-            created_at_epoch_ms = now,
-            updated_at_epoch_ms = now,
-        )
+            val projectId = database.projectQueries.lastInsertedRowId().executeAsOne()
 
-        val projectId = database.projectQueries.lastInsertedRowId().executeAsOne()
-
-        database.projectQueries.selectProjectById(projectId)
-            .executeAsOne()
-            .toDomainModel()
+            database.projectQueries.selectProjectById(projectId)
+                .executeAsOneOrNull()
+                ?.toDomainModel()
+                ?: database.projectQueries.selectAllProjects()
+                    .executeAsList()
+                    .first { project ->
+                        project.title == title &&
+                            project.template_id == templateId &&
+                            project.created_at_epoch_ms == now
+                    }
+                    .toDomainModel()
+        }
     }
 
     override fun observeProjects(): List<Project> = database.projectQueries.selectAllProjects()
