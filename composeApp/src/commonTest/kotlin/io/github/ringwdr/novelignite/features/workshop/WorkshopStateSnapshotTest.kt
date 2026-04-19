@@ -8,13 +8,29 @@ import kotlin.test.assertNull
 class WorkshopStateSnapshotTest {
     @Test
     fun fromUiState_persistsOnlyDurableTurns() {
+        val completedAssistant = WorkshopAssistantTurn(
+            renderedMarkdown = "Done",
+            choices = listOf(
+                WorkshopChoice(
+                    id = "choice-1",
+                    label = "Keep going",
+                    prompt = "Keep going",
+                    style = WorkshopChoiceStyle.Primary,
+                ),
+            ),
+            metadata = WorkshopAssistantMetadata(
+                title = "Assistant summary",
+                badge = "Completed",
+            ),
+            phase = WorkshopAssistantPhase.Completed,
+        )
         val state = WorkshopUiState(
             draftText = "Keep this",
             chatInputText = "Transient input",
             messages = listOf(
                 WorkshopChatMessage.user("u-1", "Hello"),
                 WorkshopChatMessage.assistant("a-1", "Working", isStreaming = true),
-                WorkshopChatMessage.assistant("a-2", "Done"),
+                WorkshopChatMessage.assistant("a-2", assistant = completedAssistant),
             ),
             streamingStatus = WorkshopStreamingStatus.Streaming,
             errorMessage = "Temporary failure",
@@ -34,6 +50,7 @@ class WorkshopStateSnapshotTest {
                     id = "a-2",
                     role = WorkshopMessageRole.Assistant,
                     text = "Done",
+                    assistant = completedAssistant,
                 ),
             ),
             snapshot.messages,
@@ -43,6 +60,21 @@ class WorkshopStateSnapshotTest {
 
     @Test
     fun toUiState_restoresIdleStateWithoutRevivingStreamingAssistantTurn() {
+        val completedAssistant = WorkshopAssistantTurn(
+            renderedMarkdown = "Done",
+            choices = listOf(
+                WorkshopChoice(
+                    id = "choice-1",
+                    label = "Keep going",
+                    prompt = "Keep going",
+                ),
+            ),
+            metadata = WorkshopAssistantMetadata(
+                title = "Assistant summary",
+                badge = "Completed",
+            ),
+            phase = WorkshopAssistantPhase.Completed,
+        )
         val snapshot = WorkshopStateSnapshot(
             draftText = "Saved draft",
             messages = listOf(
@@ -55,6 +87,7 @@ class WorkshopStateSnapshotTest {
                     id = "a-2",
                     role = WorkshopMessageRole.Assistant,
                     text = "Done",
+                    assistant = completedAssistant,
                 ),
             ),
             errorMessage = "Should not persist",
@@ -69,7 +102,7 @@ class WorkshopStateSnapshotTest {
         assertEquals(
             listOf(
                 WorkshopChatMessage.user("u-1", "Hello"),
-                WorkshopChatMessage.assistant("a-2", "Done"),
+                WorkshopChatMessage.assistant("a-2", assistant = completedAssistant),
             ),
             restored.messages,
         )

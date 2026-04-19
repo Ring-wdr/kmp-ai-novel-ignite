@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 
 private const val DefaultWorkshopProjectTitle = "Workshop Draft"
 private const val DefaultWorkshopTemplateId = "workshop-default-template"
+// Desktop restore stays forward-compatible with newer snapshot fields.
 private val workshopStateJson = Json { ignoreUnknownKeys = true }
 
 actual fun createDefaultWorkshopViewModel(inferenceEngine: InferenceEngine): WorkshopViewModel {

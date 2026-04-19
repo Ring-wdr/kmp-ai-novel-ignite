@@ -20,7 +20,10 @@ data class WorkshopStateSnapshot(
         fun from(state: WorkshopUiState): WorkshopStateSnapshot = WorkshopStateSnapshot(
             draftText = state.draftText,
             messages = state.messages
-                .filterNot { it.isStreaming }
+                .filter { message ->
+                    message.role != WorkshopMessageRole.Assistant ||
+                        message.assistant?.phase == WorkshopAssistantPhase.Completed
+                }
                 .map { it.toPersistedMessage() },
             errorMessage = null,
         )
@@ -30,7 +33,8 @@ data class WorkshopStateSnapshot(
 private fun WorkshopChatMessage.toPersistedMessage(): WorkshopPersistedMessage = WorkshopPersistedMessage(
     id = id,
     role = role,
-    text = text,
+    text = assistant?.renderedMarkdown ?: text,
+    assistant = assistant?.takeIf { it.phase == WorkshopAssistantPhase.Completed },
 )
 
 private fun List<WorkshopPersistedMessage>.toUiMessages(): List<WorkshopChatMessage> {
@@ -45,29 +49,14 @@ private fun List<WorkshopPersistedMessage>.toUiMessages(): List<WorkshopChatMess
     }
 }
 
-private fun WorkshopPersistedMessage.toUiMessage(): WorkshopChatMessage =
-    if (role == WorkshopMessageRole.Assistant) {
-        WorkshopChatMessage.assistant(
-            id = id,
-            assistant = WorkshopAssistantTurn(
-                renderedMarkdown = text,
-                phase = WorkshopAssistantPhase.Completed,
-            ),
-            isStreaming = false,
-        )
-    } else {
-        WorkshopChatMessage.user(id = id, text = text)
-    }
-
 private fun WorkshopPersistedMessage.toUiMessage(id: String): WorkshopChatMessage =
     if (role == WorkshopMessageRole.Assistant) {
         WorkshopChatMessage.assistant(
             id = id,
-            assistant = WorkshopAssistantTurn(
+            assistant = assistant ?: WorkshopAssistantTurn(
                 renderedMarkdown = text,
                 phase = WorkshopAssistantPhase.Completed,
             ),
-            isStreaming = false,
         )
     } else {
         WorkshopChatMessage.user(id = id, text = text)

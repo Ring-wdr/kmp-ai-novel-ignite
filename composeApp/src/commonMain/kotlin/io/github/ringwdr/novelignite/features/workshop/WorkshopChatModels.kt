@@ -61,4 +61,5 @@ data class WorkshopPersistedMessage(
     val id: String,
     val role: WorkshopMessageRole,
     val text: String,
+    val assistant: WorkshopAssistantTurn? = null,
 )
