@@ -7,13 +7,16 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.printToString
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import org.junit.Rule
 
@@ -55,7 +58,7 @@ class ChatPanelTest {
     }
 
     @Test
-    fun rendersAssistantMarkdownAndChoices() {
+    fun rendersMarkdownOutputAndLatestChoiceLabels() {
         rule.setContent {
             ChatPanel(
                 messages = listOf(
@@ -111,14 +114,27 @@ class ChatPanelTest {
             )
         }
 
-        rule.onNodeWithContentDescription("Bold response Pick a path.").assertExists()
-        rule.onNodeWithContentDescription("Continue scene").assertExists()
-        rule.onNodeWithContentDescription("Shift perspective").assertExists()
-        rule.onAllNodesWithTag("workshop-choice-choice-old").assertCountEquals(0)
+        assertContains(
+            rule.onAllNodesWithTag(WORKSHOP_ASSISTANT_MARKDOWN_TAG, useUnmergedTree = true).onLast().printToString(),
+            "Text = '[Bold response]'",
+        )
+        assertContains(
+            rule.onAllNodesWithTag(WORKSHOP_ASSISTANT_MARKDOWN_TAG, useUnmergedTree = true).onLast().printToString(),
+            "Text = '[Pick a path.]'",
+        )
+        assertContains(
+            rule.onNodeWithTag("workshop-choice-choice-1", useUnmergedTree = true).printToString(),
+            "Text = '[Continue scene]'",
+        )
+        assertContains(
+            rule.onNodeWithTag("workshop-choice-choice-2", useUnmergedTree = true).printToString(),
+            "Text = '[Shift perspective]'",
+        )
+        rule.onAllNodesWithText("Old follow-up", useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test
-    fun choiceButtons_emitPrompt_andDisableWhileStreaming() {
+    fun latestChoiceButton_usesPrompt_whenClicked() {
         var receivedPrompt: String? = null
 
         rule.setContent {
@@ -154,8 +170,14 @@ class ChatPanelTest {
             )
         }
 
-        rule.onNodeWithContentDescription("Try this next.").assertExists()
-        rule.onNodeWithContentDescription("Continue scene").assertExists()
+        assertContains(
+            rule.onNodeWithTag(WORKSHOP_ASSISTANT_MARKDOWN_TAG, useUnmergedTree = true).printToString(),
+            "Text = '[Try this next.]'",
+        )
+        assertContains(
+            rule.onNodeWithTag("workshop-choice-choice-1", useUnmergedTree = true).printToString(),
+            "Text = '[Continue scene]'",
+        )
         rule.onNodeWithTag("workshop-choice-choice-1").performClick()
         rule.runOnIdle {
             assertEquals("Continue the scene from the checkpoint.", receivedPrompt)
@@ -214,10 +236,16 @@ class ChatPanelTest {
             )
         }
 
-        rule.onNodeWithContentDescription("Still streaming.").assertExists()
-        rule.onNodeWithContentDescription("Shift perspective").assertExists()
+        assertContains(
+            rule.onAllNodesWithTag(WORKSHOP_ASSISTANT_MARKDOWN_TAG, useUnmergedTree = true).onLast().printToString(),
+            "Text = '[Still streaming.]'",
+        )
+        assertContains(
+            rule.onNodeWithTag("workshop-choice-choice-latest", useUnmergedTree = true).printToString(),
+            "Text = '[Shift perspective]'",
+        )
         rule.onNodeWithTag("workshop-choice-choice-latest").assertIsNotEnabled()
-        rule.onAllNodesWithTag("workshop-choice-choice-old").assertCountEquals(0)
+        rule.onAllNodesWithText("Old follow-up", useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test

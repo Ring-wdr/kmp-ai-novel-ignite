@@ -19,8 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -132,9 +130,7 @@ internal fun WorkshopChatTimeline(
                                                             WorkshopChoiceStyle.Primary -> Button(
                                                                 onClick = { onUseChoice(choice.prompt) },
                                                                 enabled = !isStreaming,
-                                                                modifier = Modifier
-                                                                    .testTag(workshopChoiceButtonTag(choice.id))
-                                                                    .semantics { contentDescription = choice.label },
+                                                                modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
                                                             ) {
                                                                 Text(choice.label)
                                                             }
@@ -142,9 +138,7 @@ internal fun WorkshopChatTimeline(
                                                             WorkshopChoiceStyle.Secondary -> OutlinedButton(
                                                                 onClick = { onUseChoice(choice.prompt) },
                                                                 enabled = !isStreaming,
-                                                                modifier = Modifier
-                                                                    .testTag(workshopChoiceButtonTag(choice.id))
-                                                                    .semantics { contentDescription = choice.label },
+                                                                modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
                                                             ) {
                                                                 Text(choice.label)
                                                             }
