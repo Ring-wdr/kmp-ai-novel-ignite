@@ -66,6 +66,7 @@ fun TemplatesScreen(
         templates.firstOrNull { it.id == templateId }
     }
     val selectedTemplateVersionKey = selectedTemplate?.let { template -> template.id to template.updatedAtEpochMs }
+    val hasPendingPromptBlockInput = promptBlockInput.text.isNotBlank()
 
     fun clearTransientEditorState() {
         promptBlockInput = TextFieldValue("")
@@ -95,7 +96,7 @@ fun TemplatesScreen(
     }
 
     fun requestReturnToList() {
-        if (editorViewModel.hasUnsavedChanges()) {
+        if (editorViewModel.hasUnsavedChanges() || hasPendingPromptBlockInput) {
             showDiscardDialog = true
         } else {
             forceReturnToList()
@@ -185,7 +186,7 @@ fun TemplatesScreen(
                                 },
                             )
                             templates = loadTemplates()
-                            if (activeTemplate?.id == savedTemplate.id) {
+                            if (screenState.editorMode == TemplateEditorMode.Create || activeTemplate?.id == savedTemplate.id) {
                                 ActiveWorkshopTemplateStore.select(
                                     ActiveWorkshopTemplate(
                                         id = savedTemplate.id,

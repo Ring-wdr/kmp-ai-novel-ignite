@@ -158,6 +158,43 @@ class TemplatesScreenTest {
     }
 
     @Test
+    fun createSave_activatesSavedTemplateInWorkshop() {
+        ActiveWorkshopTemplateStore.configure(NoOpPersistence)
+        val templates = mutableListOf<Template>()
+
+        rule.setContent {
+            TemplatesScreen(
+                loadTemplates = { templates.toList() },
+                loadTemplateVersions = { emptyList() },
+                saveTemplate = { draft, templateId, _, _ ->
+                    val saved = sampleTemplate(
+                        id = templateId ?: 99L,
+                        title = draft.title,
+                        genre = draft.genre,
+                        premise = draft.premise,
+                        promptBlocks = draft.promptBlocks,
+                    )
+                    templates.removeAll { it.id == saved.id }
+                    templates += saved
+                    saved
+                },
+                deleteTemplate = {},
+                enrichTemplate = { it },
+            )
+        }
+
+        rule.onNodeWithTag(TEMPLATE_NEW_BUTTON_TAG).performClick()
+        rule.onNodeWithTag(TEMPLATE_TITLE_FIELD_TAG).performTextInput("Moon Archive")
+        rule.onNodeWithTag(TEMPLATE_GENRE_FIELD_TAG).performTextInput("Fantasy")
+        rule.onNodeWithTag(TEMPLATE_PREMISE_FIELD_TAG).performTextInput("A moon archivist wakes an old debt.")
+        rule.onNodeWithTag(TEMPLATE_PROMPT_INPUT_FIELD_TAG).performTextInput("Keep the tone haunted")
+        rule.onNodeWithText("Add").performClick()
+        rule.onNodeWithText("Save Template").performClick()
+
+        rule.onNodeWithText("Workshop active: Moon Archive").fetchSemanticsNode()
+    }
+
+    @Test
     fun deleteFlow_confirmsBeforeRemovingTemplate_andClearsWorkshopSelection() {
         ActiveWorkshopTemplateStore.configure(NoOpPersistence)
         val templates = mutableListOf(sampleTemplate())
@@ -219,6 +256,29 @@ class TemplatesScreenTest {
         rule.onNodeWithTag(TEMPLATE_BACK_BUTTON_TAG).performClick()
         rule.onNodeWithText("Discard changes").performClick()
         rule.onNodeWithText("Templates").fetchSemanticsNode()
+    }
+
+    @Test
+    fun backFromEditor_withOnlyPromptBlockInput_showsDiscardDialog() {
+        ActiveWorkshopTemplateStore.configure(NoOpPersistence)
+
+        rule.setContent {
+            TemplatesScreen(
+                loadTemplates = { emptyList() },
+                loadTemplateVersions = { emptyList() },
+                saveTemplate = { draft, _, _, _ -> sampleTemplate(id = 99L, title = draft.title, genre = draft.genre, premise = draft.premise, promptBlocks = draft.promptBlocks) },
+                deleteTemplate = {},
+                enrichTemplate = { it },
+            )
+        }
+
+        rule.onNodeWithTag(TEMPLATE_NEW_BUTTON_TAG).performClick()
+        rule.onNodeWithTag(TEMPLATE_PROMPT_INPUT_FIELD_TAG).performTextInput("This is still a draft prompt block")
+        rule.onNodeWithTag(TEMPLATE_BACK_BUTTON_TAG).performClick()
+
+        rule.onNodeWithText("Discard changes?").fetchSemanticsNode()
+        rule.onNodeWithText("Keep editing").performClick()
+        rule.onNodeWithText("New Template").fetchSemanticsNode()
     }
 }
 
