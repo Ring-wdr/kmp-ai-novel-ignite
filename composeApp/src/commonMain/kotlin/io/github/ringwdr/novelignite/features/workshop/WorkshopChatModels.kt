@@ -45,10 +45,12 @@ data class WorkshopChatMessage(
             )
 
         fun assistant(id: String, text: String, isStreaming: Boolean = false): WorkshopChatMessage =
-            WorkshopChatMessage(
+            assistant(
                 id = id,
-                role = WorkshopMessageRole.Assistant,
-                text = text,
+                assistant = WorkshopAssistantTurn(
+                    renderedMarkdown = text,
+                    phase = if (isStreaming) WorkshopAssistantPhase.Streaming else WorkshopAssistantPhase.Completed,
+                ),
                 isStreaming = isStreaming,
             )
     }

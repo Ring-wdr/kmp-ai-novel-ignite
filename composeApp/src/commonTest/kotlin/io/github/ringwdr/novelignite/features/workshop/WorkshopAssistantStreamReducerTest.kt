@@ -7,6 +7,20 @@ import kotlin.test.assertTrue
 
 class WorkshopAssistantStreamReducerTest {
     @Test
+    fun assistantFactory_wrapsTextInTypedAssistantState() {
+        val message = WorkshopChatMessage.assistant(
+            id = "generation-1-assistant",
+            text = "Draft",
+            isStreaming = true,
+        )
+
+        assertEquals("Draft", message.text)
+        assertEquals("Draft", message.assistant?.renderedMarkdown)
+        assertEquals(WorkshopAssistantPhase.Streaming, message.assistant?.phase)
+        assertTrue(message.isStreaming)
+    }
+
+    @Test
     fun startThenMarkdownDelta_createsStreamingAssistantTurn() {
         val started = WorkshopAssistantStreamReducer.apply(
             state = WorkshopUiState(),
