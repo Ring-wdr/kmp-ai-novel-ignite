@@ -1,25 +1,22 @@
 package io.github.ringwdr.novelignite.features.workshop
 
-import io.github.ringwdr.novelignite.domain.inference.GenerationEvent
 import io.github.ringwdr.novelignite.domain.inference.GenerationRequest
-import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.launch
 
 class WorkshopViewModel(
-    private val inferenceEngine: InferenceEngine,
+    private val streamSource: WorkshopAssistantStreamSource,
     private val templateId: String = "workshop-default-template",
     private val templatePromptBlocks: List<String> = emptyList(),
     initialState: WorkshopUiState = WorkshopUiState(),
@@ -74,8 +71,8 @@ class WorkshopViewModel(
         if (activeGenerationJob != null) return
 
         val generationId = ++nextGenerationId
-        val userMessageId = "generation-$generationId-user"
-        val assistantMessageId = "generation-$generationId-assistant"
+        val userMessageId = workshopGenerationUserMessageId(generationId)
+        val assistantMessageId = workshopGenerationAssistantMessageId(generationId)
         val manuscriptExcerpt = _state.value.draftText
         activeGenerationId = generationId
         activeAssistantMessageId = assistantMessageId
@@ -105,28 +102,22 @@ class WorkshopViewModel(
 
         val generationJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                inferenceEngine.streamGenerate(
-                    GenerationRequest(
+                streamSource.stream(
+                    request = GenerationRequest(
                         projectId = "workshop-project",
                         templateId = templateId,
                         actionType = actionType,
                         userPrompt = userFacingPrompt,
                         manuscriptExcerpt = manuscriptExcerpt,
                         promptBlocks = templatePromptBlocks,
-                    )
+                    ),
+                    generationId = generationId,
                 ).collect { event ->
-                    when (event) {
-                        is GenerationEvent.Token -> appendAssistantToken(assistantMessageId, event.text)
-                        is GenerationEvent.Final -> finalizeAssistantTurn(
-                            generationId = generationId,
-                            assistantMessageId = assistantMessageId,
-                            finalText = event.text,
-                        )
-                        is GenerationEvent.Error -> cleanupStreamingAssistant(
-                            generationId = generationId,
-                            errorMessage = event.message,
-                        )
-                    }
+                    handleAssistantStreamEvent(
+                        generationId = generationId,
+                        assistantMessageId = assistantMessageId,
+                        event = event,
+                    )
                 }
             } catch (throwable: Throwable) {
                 if (throwable is CancellationException && throwable.message == "User aborted generation") {
@@ -162,6 +153,58 @@ class WorkshopViewModel(
         }
     }
 
+    private fun handleAssistantStreamEvent(
+        generationId: Int,
+        assistantMessageId: String,
+        event: WorkshopAssistantStreamEvent,
+    ) {
+        when (event) {
+            is WorkshopAssistantStreamEvent.Start -> ensureStreamingAssistant(event.messageId)
+            is WorkshopAssistantStreamEvent.MarkdownDelta -> appendAssistantToken(
+                assistantMessageId = assistantMessageId,
+                token = event.markdown,
+            )
+            is WorkshopAssistantStreamEvent.ChoicesReplace -> updateAssistantChoices(
+                assistantMessageId = assistantMessageId,
+                choices = event.choices,
+            )
+            is WorkshopAssistantStreamEvent.MetadataPatch -> updateAssistantMetadata(
+                assistantMessageId = assistantMessageId,
+                title = event.title,
+                badge = event.badge,
+            )
+            is WorkshopAssistantStreamEvent.Complete -> finalizeAssistantTurn(
+                generationId = generationId,
+                assistantMessageId = assistantMessageId,
+            )
+            is WorkshopAssistantStreamEvent.AbortAck -> cleanupStreamingAssistant(
+                generationId = generationId,
+                errorMessage = null,
+            )
+            is WorkshopAssistantStreamEvent.Error -> cleanupStreamingAssistant(
+                generationId = generationId,
+                errorMessage = event.message,
+            )
+        }
+    }
+
+    private fun ensureStreamingAssistant(messageId: String) {
+        if (_state.value.messages.any { message -> message.id == messageId }) return
+
+        _state.update {
+            it.copy(
+                messages = it.messages + WorkshopChatMessage.assistant(
+                    id = messageId,
+                    assistant = WorkshopAssistantTurn(
+                        renderedMarkdown = "",
+                        phase = WorkshopAssistantPhase.Streaming,
+                    ),
+                    isStreaming = true,
+                ),
+            )
+        }
+    }
+
     private fun appendAssistantToken(
         assistantMessageId: String,
         token: String,
@@ -187,10 +230,59 @@ class WorkshopViewModel(
         }
     }
 
+    private fun updateAssistantChoices(
+        assistantMessageId: String,
+        choices: List<WorkshopChoice>,
+    ) {
+        if (activeAssistantMessageId != assistantMessageId) return
+        _state.update {
+            it.copy(
+                messages = it.messages.map { message ->
+                    if (message.id == assistantMessageId && message.isStreaming) {
+                        val assistant = message.assistant ?: return@map message
+                        message.withAssistant(
+                            assistant.copy(
+                                choices = choices,
+                            )
+                        )
+                    } else {
+                        message
+                    }
+                },
+            )
+        }
+    }
+
+    private fun updateAssistantMetadata(
+        assistantMessageId: String,
+        title: String?,
+        badge: String?,
+    ) {
+        if (activeAssistantMessageId != assistantMessageId) return
+        _state.update {
+            it.copy(
+                messages = it.messages.map { message ->
+                    if (message.id == assistantMessageId && message.isStreaming) {
+                        val assistant = message.assistant ?: return@map message
+                        message.withAssistant(
+                            assistant.copy(
+                                metadata = assistant.metadata.copy(
+                                    title = title ?: assistant.metadata.title,
+                                    badge = badge ?: assistant.metadata.badge,
+                                ),
+                            )
+                        )
+                    } else {
+                        message
+                    }
+                },
+            )
+        }
+    }
+
     private fun finalizeAssistantTurn(
         generationId: Int,
         assistantMessageId: String,
-        finalText: String,
     ) {
         if (activeGenerationId != generationId) return
         if (activeAssistantMessageId != assistantMessageId) return
@@ -203,7 +295,6 @@ class WorkshopViewModel(
                         val assistant = message.assistant ?: return@map message
                         message.withAssistant(
                             assistant.copy(
-                                renderedMarkdown = finalText,
                                 phase = WorkshopAssistantPhase.Completed,
                                 failureMessage = null,
                             )

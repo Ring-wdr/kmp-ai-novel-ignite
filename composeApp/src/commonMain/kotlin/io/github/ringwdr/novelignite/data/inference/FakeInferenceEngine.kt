@@ -9,8 +9,10 @@ import kotlinx.coroutines.flow.flow
 // Test fixture kept in commonMain to satisfy the Task 6 scaffold contract.
 internal class FakeInferenceEngine : InferenceEngine {
     override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-        emit(GenerationEvent.Token("The gate opened."))
-        emit(GenerationEvent.Token(" A silver wind answered."))
-        emit(GenerationEvent.Final("The gate opened. A silver wind answered."))
+        val opening = "The gate opened."
+        val ending = " A silver wind answered."
+        emit(GenerationEvent.Token(opening))
+        emit(GenerationEvent.Token(ending))
+        emit(GenerationEvent.Final(opening + ending))
     }
 }

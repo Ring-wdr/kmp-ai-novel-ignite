@@ -1,8 +1,6 @@
 package io.github.ringwdr.novelignite.features.workshop
 
-import io.github.ringwdr.novelignite.domain.inference.GenerationEvent
 import io.github.ringwdr.novelignite.domain.inference.GenerationRequest
-import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -30,11 +28,9 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    emit(GenerationEvent.Final("ok"))
-                }
+            streamSource = recordingSource(requests) { request, generationId ->
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), workshopGenerationAssistantMessageId(generationId)))
+                emit(WorkshopAssistantStreamEvent.Complete(workshopGenerationAssistantMessageId(generationId)))
             },
             templateId = "42",
             templatePromptBlocks = listOf(
@@ -65,11 +61,9 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    emit(GenerationEvent.Final("ok"))
-                }
+            streamSource = recordingSource(requests) { request, generationId ->
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), workshopGenerationAssistantMessageId(generationId)))
+                emit(WorkshopAssistantStreamEvent.Complete(workshopGenerationAssistantMessageId(generationId)))
             },
             templateId = "42",
             templatePromptBlocks = listOf(
@@ -99,11 +93,10 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    emit(GenerationEvent.Final("The gate opened."))
-                }
+            streamSource = recordingSource(requests) { request, generationId ->
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), workshopGenerationAssistantMessageId(generationId)))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(workshopGenerationAssistantMessageId(generationId), "The gate opened."))
+                emit(WorkshopAssistantStreamEvent.Complete(workshopGenerationAssistantMessageId(generationId)))
             },
         )
 
@@ -139,20 +132,16 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    when (requests.size) {
-                        1 -> {
-                            emit(GenerationEvent.Token("The gate opened."))
-                            withContext(NonCancellable) {
-                                release.receive()
-                            }
-                            emit(GenerationEvent.Final("The gate opened."))
-                        }
-                        else -> emit(GenerationEvent.Final("The gate opened."))
+            streamSource = recordingSource(requests) { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "The gate opened."))
+                if (requests.size == 1) {
+                    withContext(NonCancellable) {
+                        release.receive()
                     }
                 }
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
             },
         )
 
@@ -205,18 +194,17 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    when (requests.size) {
-                        1 -> {
-                            emit(GenerationEvent.Token("The gate opened."))
-                            emit(GenerationEvent.Error("boom"))
-                            release.receive()
-                            emit(GenerationEvent.Final("ignored"))
-                        }
-                        else -> emit(GenerationEvent.Final("The gate opened."))
+            streamSource = recordingSource(requests) { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "The gate opened."))
+                if (requests.size == 1) {
+                    emit(WorkshopAssistantStreamEvent.Error(messageId, "boom"))
+                    withContext(NonCancellable) {
+                        release.receive()
                     }
+                } else {
+                    emit(WorkshopAssistantStreamEvent.Complete(messageId))
                 }
             },
         )
@@ -267,11 +255,11 @@ class WorkshopViewModelTest {
     fun generationCancellationException_isHandledLikeAnError() = runTest {
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    emit(GenerationEvent.Token("The gate opened."))
-                    throw CancellationException("boom")
-                }
+            streamSource = source { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "The gate opened."))
+                throw CancellationException("boom")
             },
         )
 
@@ -296,15 +284,16 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    emit(GenerationEvent.Final("one"))
+            streamSource = recordingSource(requests) { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
+                withContext(NonCancellable) {
                     release.receive()
-                    emit(GenerationEvent.Final("late-final"))
-                    emit(GenerationEvent.Error("late-error"))
-                    collectorFinished.send(Unit)
                 }
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
+                emit(WorkshopAssistantStreamEvent.Error(messageId, "late-error"))
+                collectorFinished.send(Unit)
             },
         )
 
@@ -318,7 +307,7 @@ class WorkshopViewModelTest {
                 WorkshopChatMessage.user(id = "generation-1-user", text = "Continue scene"),
                 WorkshopChatMessage.assistant(
                     id = "generation-1-assistant",
-                    text = "one",
+                    text = "",
                     isStreaming = false,
                 ),
             ),
@@ -335,7 +324,7 @@ class WorkshopViewModelTest {
                 WorkshopChatMessage.user(id = "generation-1-user", text = "Continue scene"),
                 WorkshopChatMessage.assistant(
                     id = "generation-1-assistant",
-                    text = "one",
+                    text = "",
                     isStreaming = false,
                 ),
             ),
@@ -352,16 +341,16 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    if (requests.size == 1) {
-                        emit(GenerationEvent.Final("one"))
+            streamSource = recordingSource(requests) { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "one"))
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
+                if (requests.size == 1) {
+                    withContext(NonCancellable) {
                         release.receive()
-                        collectorFinished.send(Unit)
-                    } else {
-                        emit(GenerationEvent.Final("one"))
                     }
+                    collectorFinished.send(Unit)
                 }
             },
         )
@@ -414,16 +403,16 @@ class WorkshopViewModelTest {
         val requests = mutableListOf<GenerationRequest>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    if (requests.size == 1) {
-                        emit(GenerationEvent.Final("one"))
+            streamSource = recordingSource(requests) { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "one"))
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
+                if (requests.size == 1) {
+                    withContext(NonCancellable) {
                         release.receive()
-                        collectorFinished.send(Unit)
-                    } else {
-                        emit(GenerationEvent.Final("one"))
                     }
+                    collectorFinished.send(Unit)
                 }
             },
         )
@@ -483,11 +472,11 @@ class WorkshopViewModelTest {
         )
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    requests += request
-                    emit(GenerationEvent.Final("Reply three"))
-                }
+            streamSource = recordingSource(requests) { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "Reply three"))
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
             },
             initialState = initialState,
         )
@@ -523,8 +512,8 @@ class WorkshopViewModelTest {
         val persistedDrafts = mutableListOf<String>()
         val viewModel = newViewModel(
             testScheduler = testScheduler,
-            inferenceEngine = object : InferenceEngine {
-                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flowOf()
+            streamSource = source { _, _ ->
+                emit(WorkshopAssistantStreamEvent.Complete("generation-1-assistant"))
             },
             persistState = { state ->
                 inFlight += 1
@@ -560,7 +549,7 @@ class WorkshopViewModelTest {
 
 private fun newViewModel(
     testScheduler: TestCoroutineScheduler,
-    inferenceEngine: InferenceEngine,
+    streamSource: WorkshopAssistantStreamSource,
     templateId: String = "workshop-default-template",
     templatePromptBlocks: List<String> = emptyList(),
     initialState: WorkshopUiState = WorkshopUiState(),
@@ -568,11 +557,30 @@ private fun newViewModel(
 ): WorkshopViewModel {
     val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
     return WorkshopViewModel(
-        inferenceEngine = inferenceEngine,
+        streamSource = streamSource,
         templateId = templateId,
         templatePromptBlocks = templatePromptBlocks,
         initialState = initialState,
         persistState = persistState,
         scope = scope,
     )
+}
+
+private fun source(
+    block: suspend kotlinx.coroutines.flow.FlowCollector<WorkshopAssistantStreamEvent>.(GenerationRequest, Int) -> Unit,
+): WorkshopAssistantStreamSource = object : WorkshopAssistantStreamSource {
+    override fun stream(
+        request: GenerationRequest,
+        generationId: Int,
+    ): Flow<WorkshopAssistantStreamEvent> = flow {
+        block(request, generationId)
+    }
+}
+
+private fun recordingSource(
+    requests: MutableList<GenerationRequest>,
+    block: suspend kotlinx.coroutines.flow.FlowCollector<WorkshopAssistantStreamEvent>.(GenerationRequest, Int) -> Unit,
+): WorkshopAssistantStreamSource = source { request, generationId ->
+    requests += request
+    block(request, generationId)
 }

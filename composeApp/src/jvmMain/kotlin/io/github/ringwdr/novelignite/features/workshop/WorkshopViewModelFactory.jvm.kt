@@ -30,7 +30,10 @@ actual fun createDefaultWorkshopViewModel(inferenceEngine: InferenceEngine): Wor
         ?: WorkshopUiState()
 
     return WorkshopViewModel(
-        inferenceEngine = inferenceEngine,
+        streamSource = DefaultWorkshopAssistantStreamSource(
+            inferenceEngine = inferenceEngine,
+            choiceBuilder = WorkshopChoiceBuilder(),
+        ),
         initialState = initialState,
         templateId = promptConfig.templateId,
         templatePromptBlocks = promptConfig.promptBlocks,
