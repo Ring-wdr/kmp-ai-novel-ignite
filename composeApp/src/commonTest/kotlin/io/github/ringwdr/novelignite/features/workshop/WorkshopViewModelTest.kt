@@ -156,6 +156,34 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun sendChatMessage_replacesStreamedMarkdownWithAuthoritativeFinalMarkdown() = runTest {
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "The gate..."))
+                emit(
+                    WorkshopAssistantStreamEvent.Complete(
+                        messageId = messageId,
+                        finalMarkdown = "A gate opened",
+                    )
+                )
+            },
+        )
+
+        viewModel.updateChatInput("Continue the scene")
+        viewModel.sendChatMessage()
+        runCurrent()
+
+        val assistant = viewModel.state.value.messages.last().assistant!!
+        assertEquals("A gate opened", assistant.renderedMarkdown)
+        assertEquals(WorkshopAssistantPhase.Completed, assistant.phase)
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
+        assertNull(viewModel.state.value.errorMessage)
+    }
+
+    @Test
     fun sendChatMessage_ignoresWrongMessageIdsFromTypedEvents() = runTest {
         val viewModel = newViewModel(
             testScheduler = testScheduler,

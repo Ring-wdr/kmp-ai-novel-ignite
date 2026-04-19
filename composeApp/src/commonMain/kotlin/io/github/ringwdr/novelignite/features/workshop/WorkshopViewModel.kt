@@ -176,6 +176,7 @@ class WorkshopViewModel(
             is WorkshopAssistantStreamEvent.Complete -> finalizeAssistantTurn(
                 generationId = generationId,
                 assistantMessageId = event.messageId,
+                finalMarkdown = event.finalMarkdown,
             )
             is WorkshopAssistantStreamEvent.AbortAck -> cleanupStreamingAssistant(
                 generationId = generationId,
@@ -286,6 +287,7 @@ class WorkshopViewModel(
     private fun finalizeAssistantTurn(
         generationId: Int,
         assistantMessageId: String,
+        finalMarkdown: String?,
     ) {
         if (activeGenerationId != generationId) return
         if (activeAssistantMessageId != assistantMessageId) return
@@ -298,6 +300,7 @@ class WorkshopViewModel(
                         val assistant = message.assistant ?: return@map message
                         message.withAssistant(
                             assistant.copy(
+                                renderedMarkdown = finalMarkdown ?: assistant.renderedMarkdown,
                                 phase = WorkshopAssistantPhase.Completed,
                                 failureMessage = null,
                             )

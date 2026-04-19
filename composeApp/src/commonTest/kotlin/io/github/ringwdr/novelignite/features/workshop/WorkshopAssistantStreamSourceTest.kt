@@ -53,7 +53,8 @@ class WorkshopAssistantStreamSourceTest {
         val choices = events.filterIsInstance<WorkshopAssistantStreamEvent.ChoicesReplace>().single().choices
         assertEquals(3, choices.size)
         assertTrue(choices.first().prompt.contains("chorus answered"))
-        assertTrue(events.last() is WorkshopAssistantStreamEvent.Complete)
+        val complete = events.last() as WorkshopAssistantStreamEvent.Complete
+        assertEquals("The gate opened. A silver wind answered. Then a chorus answered.", complete.finalMarkdown)
     }
 
     @Test
@@ -99,5 +100,37 @@ class WorkshopAssistantStreamSourceTest {
 
         assertEquals("fixture", mode)
         assertIs<FixtureWorkshopAssistantStreamSource>(source)
+    }
+
+    @Test
+    fun defaultSource_carriesAuthoritativeFinalMarkdownWhenFinalDoesNotExtendTokens() = runTest {
+        val source = DefaultWorkshopAssistantStreamSource(
+            inferenceEngine = object : InferenceEngine {
+                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
+                    emit(GenerationEvent.Token("The gate..."))
+                    emit(GenerationEvent.Final("A gate opened"))
+                }
+            },
+            choiceBuilder = WorkshopChoiceBuilder(),
+        )
+
+        val events = source.stream(
+            request = GenerationRequest(
+                projectId = "project",
+                templateId = "template",
+                actionType = "chat",
+                userPrompt = "Continue scene",
+                manuscriptExcerpt = "Excerpt",
+                promptBlocks = emptyList(),
+            ),
+            generationId = 9,
+        ).toList()
+
+        assertEquals(
+            listOf("The gate..."),
+            events.filterIsInstance<WorkshopAssistantStreamEvent.MarkdownDelta>().map { it.markdown },
+        )
+        val complete = events.last() as WorkshopAssistantStreamEvent.Complete
+        assertEquals("A gate opened", complete.finalMarkdown)
     }
 }

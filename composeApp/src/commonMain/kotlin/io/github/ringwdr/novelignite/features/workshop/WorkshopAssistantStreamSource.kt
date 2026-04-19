@@ -47,12 +47,12 @@ class DefaultWorkshopAssistantStreamSource(
                 is GenerationEvent.Final -> {
                     val finalMarkdown = event.text.ifBlank { streamedMarkdown.toString() }
                     val finalDelta = when {
-                        streamedMarkdown.isEmpty() -> finalMarkdown
+                        streamedMarkdown.isEmpty() -> null
                         finalMarkdown.startsWith(streamedMarkdown.toString()) ->
                             finalMarkdown.removePrefix(streamedMarkdown.toString())
-                        else -> finalMarkdown
+                        else -> null
                     }
-                    if (finalDelta.isNotBlank()) {
+                    if (!finalDelta.isNullOrBlank()) {
                         emit(
                             WorkshopAssistantStreamEvent.MarkdownDelta(
                                 messageId = messageId,
@@ -66,7 +66,12 @@ class DefaultWorkshopAssistantStreamSource(
                             choices = choiceBuilder.build(finalMarkdown),
                         )
                     )
-                    emit(WorkshopAssistantStreamEvent.Complete(messageId = messageId))
+                    emit(
+                        WorkshopAssistantStreamEvent.Complete(
+                            messageId = messageId,
+                            finalMarkdown = finalMarkdown,
+                        )
+                    )
                 }
 
                 is GenerationEvent.Error -> emit(
@@ -142,7 +147,12 @@ class FixtureWorkshopAssistantStreamSource(
                 choices = choiceBuilder.build(finalMarkdown),
             )
         )
-        emit(WorkshopAssistantStreamEvent.Complete(messageId = messageId))
+        emit(
+            WorkshopAssistantStreamEvent.Complete(
+                messageId = messageId,
+                finalMarkdown = finalMarkdown,
+            )
+        )
     }
 }
 

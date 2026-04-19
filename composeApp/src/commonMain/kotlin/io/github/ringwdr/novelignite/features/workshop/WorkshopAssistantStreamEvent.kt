@@ -34,6 +34,7 @@ sealed interface WorkshopAssistantStreamEvent {
     @Serializable
     data class Complete(
         override val messageId: String,
+        val finalMarkdown: String? = null,
     ) : WorkshopAssistantStreamEvent
 
     @Serializable
