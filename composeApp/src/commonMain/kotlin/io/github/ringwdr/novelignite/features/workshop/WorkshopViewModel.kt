@@ -194,6 +194,7 @@ class WorkshopViewModel(
     ) {
         if (activeGenerationId != generationId) return
         if (activeAssistantMessageId != assistantMessageId) return
+        if (!_state.value.isStreamingAssistant(assistantMessageId)) return
 
         _state.update {
             it.copy(
@@ -222,6 +223,7 @@ class WorkshopViewModel(
         errorMessage: String?,
     ) {
         if (activeGenerationId != generationId) return
+        if (errorMessage != null && !_state.value.isStreamingAssistant(activeAssistantMessageId)) return
 
         val assistantMessageId = activeAssistantMessageId
         _state.update {
@@ -255,3 +257,13 @@ private fun WorkshopChatMessage.withAssistant(assistant: WorkshopAssistantTurn):
         assistant = assistant,
         isStreaming = assistant.phase == WorkshopAssistantPhase.Streaming,
     )
+
+private fun WorkshopUiState.isStreamingAssistant(messageId: String?): Boolean {
+    if (messageId == null) return false
+    return messages.any { message ->
+        message.id == messageId &&
+            message.role == WorkshopMessageRole.Assistant &&
+            message.assistant?.phase == WorkshopAssistantPhase.Streaming &&
+            message.isStreaming
+    }
+}

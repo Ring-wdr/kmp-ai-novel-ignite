@@ -290,6 +290,62 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun lateTerminalEvents_doNotOverwriteCompletedAssistantTurnOrSurfaceErrors() = runTest {
+        val collectorFinished = Channel<Unit>()
+        val release = Channel<Unit>()
+        val requests = mutableListOf<GenerationRequest>()
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            inferenceEngine = object : InferenceEngine {
+                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
+                    requests += request
+                    emit(GenerationEvent.Final("one"))
+                    release.receive()
+                    emit(GenerationEvent.Final("late-final"))
+                    emit(GenerationEvent.Error("late-error"))
+                    collectorFinished.send(Unit)
+                }
+            },
+        )
+
+        viewModel.continueScene()
+        runCurrent()
+
+        assertEquals(1, requests.size)
+        assertEquals(WorkshopStreamingStatus.Recovering, viewModel.state.value.streamingStatus)
+        assertEquals(
+            listOf(
+                WorkshopChatMessage.user(id = "generation-1-user", text = "Continue scene"),
+                WorkshopChatMessage.assistant(
+                    id = "generation-1-assistant",
+                    text = "one",
+                    isStreaming = false,
+                ),
+            ),
+            viewModel.state.value.messages,
+        )
+
+        release.send(Unit)
+        collectorFinished.receive()
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                WorkshopChatMessage.user(id = "generation-1-user", text = "Continue scene"),
+                WorkshopChatMessage.assistant(
+                    id = "generation-1-assistant",
+                    text = "one",
+                    isStreaming = false,
+                ),
+            ),
+            viewModel.state.value.messages,
+        )
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
+        assertNull(viewModel.state.value.errorMessage)
+    }
+
+    @Test
     fun synchronousFinalGeneration_entersRecoveringUntilCollectorFinishes_thenAllowsRetry() = runTest {
         val release = Channel<Unit>()
         val collectorFinished = Channel<Unit>()
