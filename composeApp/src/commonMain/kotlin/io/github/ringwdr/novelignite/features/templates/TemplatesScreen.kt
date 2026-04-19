@@ -174,6 +174,10 @@ fun TemplatesScreen(
                     onPromptBlockChange = editorViewModel::updatePromptBlock,
                     onRemovePromptBlock = editorViewModel::removePromptBlock,
                     onSaveTemplate = {
+                        if (hasPendingPromptBlockInput) {
+                            promptBlockError = "Add a prompt block before continuing."
+                            return@TemplateEditorPane
+                        }
                         scope.launch {
                             val savedTemplate = editorViewModel.saveTemplate(
                                 onSave = { draft ->
