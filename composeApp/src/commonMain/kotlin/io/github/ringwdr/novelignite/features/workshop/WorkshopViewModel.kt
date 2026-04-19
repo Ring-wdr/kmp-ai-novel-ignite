@@ -46,6 +46,12 @@ class WorkshopViewModel(
         startGeneration(userFacingPrompt = prompt, actionType = "chat")
     }
 
+    fun useChoice(prompt: String) {
+        val choicePrompt = prompt.trim()
+        if (choicePrompt.isBlank()) return
+        startGeneration(userFacingPrompt = choicePrompt, actionType = "chat")
+    }
+
     fun continueScene() {
         startGeneration(userFacingPrompt = "Continue scene", actionType = "continue")
     }

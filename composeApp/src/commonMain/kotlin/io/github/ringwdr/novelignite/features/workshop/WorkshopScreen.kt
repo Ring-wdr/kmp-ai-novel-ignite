@@ -49,7 +49,7 @@ fun WorkshopScreen(
             errorMessage = state.errorMessage,
             onChatInputChange = activeViewModel::updateChatInput,
             onSendChatMessage = activeViewModel::sendChatMessage,
-            onUseChoice = activeViewModel::updateChatInput,
+            onUseChoice = activeViewModel::useChoice,
             onContinueScene = activeViewModel::continueScene,
             onAbortGeneration = activeViewModel::abortGeneration,
         )
