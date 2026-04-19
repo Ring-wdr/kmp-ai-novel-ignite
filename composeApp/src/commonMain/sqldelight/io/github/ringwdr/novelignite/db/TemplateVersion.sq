@@ -23,6 +23,11 @@ FROM TemplateVersion
 WHERE template_id = ?
 ORDER BY version_number DESC, id DESC;
 
+selectAllTemplateVersions:
+SELECT *
+FROM TemplateVersion
+ORDER BY created_at_epoch_ms DESC, id DESC;
+
 selectMaxTemplateVersionNumberByTemplateId:
 SELECT COALESCE(MAX(version_number), 0)
 FROM TemplateVersion

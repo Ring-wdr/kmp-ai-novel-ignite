@@ -7,11 +7,16 @@ import io.github.ringwdr.novelignite.features.templates.TemplatesScreen
 import io.github.ringwdr.novelignite.features.workshop.WorkshopScreen
 
 @Composable
-fun AppNavHost(destination: AppDestination) {
+fun AppNavHost(
+    destination: AppDestination,
+    onNavigate: (AppDestination) -> Unit = {},
+) {
     when (destination) {
         AppDestination.Workshop -> WorkshopScreen()
         AppDestination.Templates -> TemplatesScreen()
-        AppDestination.Board -> BoardScreen()
+        AppDestination.Board -> BoardScreen(
+            onOpenTemplates = { onNavigate(AppDestination.Templates) },
+        )
         AppDestination.Library -> LibraryScreen()
     }
 }

@@ -15,11 +15,22 @@ class TemplateEditorViewModel {
     val state = MutableStateFlow(TemplateEditorState())
 
     fun loadTemplate(template: Template) {
+        loadDraft(
+            TemplateDraft(
+                title = template.title,
+                genre = template.genre,
+                premise = template.premise,
+                promptBlocks = template.promptBlocks,
+            )
+        )
+    }
+
+    fun loadDraft(draft: TemplateDraft) {
         state.value = TemplateEditorState(
-            title = template.title,
-            genre = template.genre,
-            premise = template.premise,
-            promptBlocks = template.promptBlocks,
+            title = draft.title,
+            genre = draft.genre,
+            premise = draft.premise,
+            promptBlocks = draft.promptBlocks,
         )
     }
 

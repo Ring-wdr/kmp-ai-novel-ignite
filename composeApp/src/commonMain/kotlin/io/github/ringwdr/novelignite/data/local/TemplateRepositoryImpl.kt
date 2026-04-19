@@ -118,6 +118,11 @@ class TemplateRepositoryImpl(
             .executeAsList()
             .map { it.toDomainModel(json) }
 
+    override fun listAllTemplateVersions(): List<TemplateVersion> =
+        database.templateVersionQueries.selectAllTemplateVersions()
+            .executeAsList()
+            .map { it.toDomainModel(json) }
+
     private fun insertTemplate(
         title: String,
         genre: String,

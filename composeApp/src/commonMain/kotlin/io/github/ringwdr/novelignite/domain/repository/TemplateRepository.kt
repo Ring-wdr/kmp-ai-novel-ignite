@@ -22,4 +22,6 @@ interface TemplateRepository {
     fun listTemplates(): List<Template>
 
     fun listTemplateVersions(templateId: Long): List<TemplateVersion>
+
+    fun listAllTemplateVersions(): List<TemplateVersion>
 }

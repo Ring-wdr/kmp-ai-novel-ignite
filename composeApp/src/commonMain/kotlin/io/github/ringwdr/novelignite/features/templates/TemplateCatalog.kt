@@ -11,4 +11,5 @@ expect suspend fun saveLocalTemplate(
     draft: TemplateDraft,
     templateId: Long? = null,
     originalTemplate: Template? = null,
+    originalVersion: TemplateVersion? = null,
 ): Template

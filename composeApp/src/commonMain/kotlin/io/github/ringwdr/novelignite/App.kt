@@ -44,7 +44,10 @@ fun App() {
                 }
             }
 
-            AppNavHost(currentDestination)
+            AppNavHost(
+                destination = currentDestination,
+                onNavigate = { currentDestination = it },
+            )
         }
     }
 }

@@ -15,6 +15,13 @@ internal object AndroidTemplateMemoryStore {
     fun listVersions(templateId: Long): List<TemplateVersion> =
         versionsByTemplateId[templateId].orEmpty().toList()
 
+    fun listAllVersions(): List<TemplateVersion> = versionsByTemplateId.values
+        .flatten()
+        .sortedWith(
+            compareByDescending<TemplateVersion> { it.createdAtEpochMs }
+                .thenByDescending { it.id }
+        )
+
     fun save(draft: TemplateDraft, templateId: Long?, originalTemplate: Template?): Template {
         val now = Clock.System.now().toEpochMilliseconds()
         val existing = when {
@@ -78,8 +85,54 @@ actual suspend fun saveLocalTemplate(
     draft: TemplateDraft,
     templateId: Long?,
     originalTemplate: Template?,
-): Template = AndroidTemplateMemoryStore.save(
-    draft = draft,
-    templateId = templateId,
-    originalTemplate = originalTemplate,
-)
+    originalVersion: TemplateVersion?,
+): Template {
+    val resolvedOriginalTemplate = when {
+        originalTemplate != null -> originalTemplate
+        templateId != null -> AndroidTemplateMemoryStore.list().firstOrNull { it.id == templateId }
+        else -> null
+    }
+    val seed = resolveTemplateSaveSeed(
+        draft = draft,
+        templateId = templateId,
+        originalTemplate = resolvedOriginalTemplate,
+        originalVersion = originalVersion,
+    )
+    val preservedTemplate = resolvedOriginalTemplate ?: originalVersion?.let { version ->
+        Template(
+            id = version.templateId,
+            title = version.title,
+            genre = version.genre,
+            premise = version.premise,
+            worldSetting = version.worldSetting,
+            characterCards = version.characterCards,
+            relationshipNotes = version.relationshipNotes,
+            toneStyle = version.toneStyle,
+            bannedElements = version.bannedElements,
+            plotConstraints = version.plotConstraints,
+            openingHook = version.openingHook,
+            promptBlocks = version.promptBlocks,
+            createdAtEpochMs = version.createdAtEpochMs,
+            updatedAtEpochMs = version.createdAtEpochMs,
+        )
+    }
+
+    return AndroidTemplateMemoryStore.save(
+        draft = TemplateDraft(
+            title = seed.title,
+            genre = seed.genre,
+            premise = seed.premise,
+            promptBlocks = seed.promptBlocks,
+        ),
+        templateId = seed.templateId,
+        originalTemplate = preservedTemplate?.copy(
+            worldSetting = seed.worldSetting,
+            characterCards = seed.characterCards,
+            relationshipNotes = seed.relationshipNotes,
+            toneStyle = seed.toneStyle,
+            bannedElements = seed.bannedElements,
+            plotConstraints = seed.plotConstraints,
+            openingHook = seed.openingHook,
+        ),
+    )
+}
