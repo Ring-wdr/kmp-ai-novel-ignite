@@ -50,6 +50,7 @@ object WorkshopAssistantStreamReducer {
 
         is WorkshopAssistantStreamEvent.Complete -> state.updateAssistant(event.messageId) { current ->
             current.copy(
+                renderedMarkdown = event.finalMarkdown ?: current.renderedMarkdown,
                 phase = WorkshopAssistantPhase.Completed,
                 failureMessage = null,
             )

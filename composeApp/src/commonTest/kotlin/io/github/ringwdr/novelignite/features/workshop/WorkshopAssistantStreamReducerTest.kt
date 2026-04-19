@@ -223,6 +223,37 @@ class WorkshopAssistantStreamReducerTest {
     }
 
     @Test
+    fun complete_replacesRenderedMarkdownWhenAuthoritativeFinalMarkdownIsPresent() {
+        val base = WorkshopUiState(
+            messages = listOf(
+                WorkshopChatMessage.assistant(
+                    id = "generation-1-assistant",
+                    assistant = WorkshopAssistantTurn(
+                        renderedMarkdown = "Streamed draft...",
+                        phase = WorkshopAssistantPhase.Streaming,
+                    ),
+                    isStreaming = true,
+                ),
+            ),
+            streamingStatus = WorkshopStreamingStatus.Streaming,
+        )
+
+        val completed = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.Complete(
+                messageId = "generation-1-assistant",
+                finalMarkdown = "Authoritative final markdown",
+            ),
+        )
+
+        val assistant = completed.messages.single().assistant!!
+        assertEquals("Authoritative final markdown", assistant.renderedMarkdown)
+        assertEquals(WorkshopAssistantPhase.Completed, assistant.phase)
+        assertFalse(completed.messages.single().isStreaming)
+        assertEquals(WorkshopStreamingStatus.Idle, completed.streamingStatus)
+    }
+
+    @Test
     fun error_removesMatchingStreamingAssistantTurn() {
         val base = WorkshopUiState(
             messages = listOf(
