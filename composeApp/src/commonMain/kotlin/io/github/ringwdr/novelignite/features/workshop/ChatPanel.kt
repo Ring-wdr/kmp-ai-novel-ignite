@@ -22,6 +22,7 @@ fun ChatPanel(
     errorMessage: String?,
     onChatInputChange: (String) -> Unit,
     onSendChatMessage: () -> Unit,
+    onUseChoice: (String) -> Unit,
     onContinueScene: () -> Unit,
     onAbortGeneration: () -> Unit,
     modifier: Modifier = Modifier,
@@ -53,7 +54,10 @@ fun ChatPanel(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            WorkshopChatTimeline(messages = messages)
+            WorkshopChatTimeline(
+                messages = messages,
+                onUseChoice = onUseChoice,
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

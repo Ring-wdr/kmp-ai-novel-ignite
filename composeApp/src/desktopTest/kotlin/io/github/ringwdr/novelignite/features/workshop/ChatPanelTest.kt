@@ -38,6 +38,7 @@ class ChatPanelTest {
                 errorMessage = null,
                 onChatInputChange = {},
                 onSendChatMessage = {},
+                onUseChoice = {},
                 onContinueScene = {},
                 onAbortGeneration = {},
             )
@@ -48,6 +49,114 @@ class ChatPanelTest {
         rule.onNodeWithText("Generating...").assertExists()
         rule.onNodeWithText("Abort").assertExists()
         rule.onNodeWithTag(WORKSHOP_CHAT_INPUT_TAG).assertExists()
+    }
+
+    @Test
+    fun rendersAssistantMarkdownAndChoices() {
+        rule.setContent {
+            ChatPanel(
+                messages = listOf(
+                    WorkshopChatMessage.assistant(
+                        id = "assistant-1",
+                        text = "",
+                        isStreaming = false,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "# Bold response\n\nPick a path.",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-1",
+                                    label = "Continue scene",
+                                    prompt = "Continue the scene from the checkpoint.",
+                                    style = WorkshopChoiceStyle.Primary,
+                                ),
+                                WorkshopChoice(
+                                    id = "choice-2",
+                                    label = "Shift perspective",
+                                    prompt = "Shift the perspective around the checkpoint.",
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Completed,
+                        ),
+                    ),
+                ),
+                chatInputText = "",
+                streamingStatus = WorkshopStreamingStatus.Idle,
+                errorMessage = null,
+                onChatInputChange = {},
+                onSendChatMessage = {},
+                onUseChoice = {},
+                onContinueScene = {},
+                onAbortGeneration = {},
+            )
+        }
+
+        rule.onNodeWithTag(WORKSHOP_ASSISTANT_MARKDOWN_TAG).assertExists()
+        rule.onNodeWithTag("workshop-choice-choice-1").assertExists()
+        rule.onNodeWithTag("workshop-choice-choice-2").assertExists()
+    }
+
+    @Test
+    fun choiceButtons_emitPrompt_andDisableWhileStreaming() {
+        var receivedPrompt: String? = null
+
+        rule.setContent {
+            ChatPanel(
+                messages = listOf(
+                    WorkshopChatMessage.assistant(
+                        id = "assistant-1",
+                        text = "",
+                        isStreaming = false,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "Try this next.",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-1",
+                                    label = "Continue scene",
+                                    prompt = "Continue the scene from the checkpoint.",
+                                    style = WorkshopChoiceStyle.Primary,
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Completed,
+                        ),
+                    ),
+                    WorkshopChatMessage.assistant(
+                        id = "assistant-2",
+                        text = "",
+                        isStreaming = true,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "Still streaming.",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-2",
+                                    label = "Shift perspective",
+                                    prompt = "Shift the perspective around the checkpoint.",
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Streaming,
+                        ),
+                        isStreaming = true,
+                    ),
+                ),
+                chatInputText = "",
+                streamingStatus = WorkshopStreamingStatus.Streaming,
+                errorMessage = null,
+                onChatInputChange = {},
+                onSendChatMessage = {},
+                onUseChoice = { receivedPrompt = it },
+                onContinueScene = {},
+                onAbortGeneration = {},
+            )
+        }
+
+        rule.onNodeWithTag("workshop-choice-choice-1").performClick()
+        rule.runOnIdle {
+            assertEquals("Continue the scene from the checkpoint.", receivedPrompt)
+        }
+
+        rule.onNodeWithTag("workshop-choice-choice-2").assertIsNotEnabled()
     }
 
     @Test
@@ -63,6 +172,7 @@ class ChatPanelTest {
                 errorMessage = null,
                 onChatInputChange = { chatInputText = it },
                 onSendChatMessage = { sent++ },
+                onUseChoice = {},
                 onContinueScene = {},
                 onAbortGeneration = {},
             )
@@ -91,6 +201,7 @@ class ChatPanelTest {
                 errorMessage = null,
                 onChatInputChange = {},
                 onSendChatMessage = {},
+                onUseChoice = {},
                 onContinueScene = {},
                 onAbortGeneration = { aborts++ },
             )
@@ -129,6 +240,7 @@ class ChatPanelTest {
                 errorMessage = null,
                 onChatInputChange = {},
                 onSendChatMessage = {},
+                onUseChoice = {},
                 onContinueScene = {},
                 onAbortGeneration = {},
             )

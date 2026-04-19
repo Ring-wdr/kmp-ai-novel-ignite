@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,15 +24,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.rememberLazyListState
 
 internal const val WORKSHOP_CHAT_TIMELINE_TAG = "workshop-chat-timeline"
+private fun workshopChoiceButtonTag(choiceId: String): String = "workshop-choice-$choiceId"
 
 @Composable
 internal fun WorkshopChatTimeline(
     messages: List<WorkshopChatMessage>,
+    onUseChoice: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    val latestMessage = messages.lastOrNull()
 
-    LaunchedEffect(messages.lastOrNull()?.id, messages.lastOrNull()?.text, messages.lastOrNull()?.isStreaming) {
+    LaunchedEffect(
+        latestMessage?.id,
+        latestMessage?.assistant?.renderedMarkdown,
+        latestMessage?.assistant?.choices?.size,
+        latestMessage?.isStreaming,
+    ) {
         if (messages.isNotEmpty()) {
             listState.scrollToItem(messages.lastIndex)
         }
@@ -62,8 +72,10 @@ internal fun WorkshopChatTimeline(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(messages, key = WorkshopChatMessage::id) { message ->
-                        val bubbleText = message.displayText()
                         val isUser = message.role == WorkshopMessageRole.User
+                        val assistant = message.assistant
+                        val bubbleText = assistant?.renderedMarkdown?.takeIf { it.isNotBlank() }
+                            ?: message.text
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -91,7 +103,47 @@ internal fun WorkshopChatTimeline(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
                                     )
-                                    Text(text = bubbleText)
+                                    if (isUser) {
+                                        Text(text = bubbleText)
+                                    } else {
+                                        val isStreaming = message.isStreaming
+                                        if (bubbleText.isBlank() && isStreaming) {
+                                            Text(text = "Generating...")
+                                        } else if (bubbleText.isNotBlank()) {
+                                            WorkshopAssistantMarkdown(
+                                                markdown = bubbleText,
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
+                                        }
+                                        assistant?.choices
+                                            .orEmpty()
+                                            .takeIf { it.isNotEmpty() }
+                                            ?.let { choices ->
+                                                Column(
+                                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                                ) {
+                                                    choices.forEach { choice ->
+                                                        when (choice.style) {
+                                                            WorkshopChoiceStyle.Primary -> Button(
+                                                                onClick = { onUseChoice(choice.prompt) },
+                                                                enabled = !isStreaming,
+                                                                modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
+                                                            ) {
+                                                                Text(choice.label)
+                                                            }
+
+                                                            WorkshopChoiceStyle.Secondary -> OutlinedButton(
+                                                                onClick = { onUseChoice(choice.prompt) },
+                                                                enabled = !isStreaming,
+                                                                modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
+                                                            ) {
+                                                                Text(choice.label)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                    }
                                 }
                             }
                         }
@@ -101,9 +153,3 @@ internal fun WorkshopChatTimeline(
         }
     }
 }
-
-private fun WorkshopChatMessage.displayText(): String =
-    when {
-        role == WorkshopMessageRole.Assistant && text.isBlank() && isStreaming -> "Generating..."
-        else -> text
-    }
