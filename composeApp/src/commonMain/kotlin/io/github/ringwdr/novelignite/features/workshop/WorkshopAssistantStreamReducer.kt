@@ -64,12 +64,10 @@ object WorkshopAssistantStreamReducer {
             streamingStatus = WorkshopStreamingStatus.Idle,
         )
 
-        is WorkshopAssistantStreamEvent.Error -> state.updateAssistant(event.messageId) { current ->
-            current.copy(
-                phase = WorkshopAssistantPhase.Failed,
-                failureMessage = event.message,
-            )
-        }.copy(
+        is WorkshopAssistantStreamEvent.Error -> state.copy(
+            messages = state.messages.filterNot { message ->
+                message.id == event.messageId && message.role == WorkshopMessageRole.Assistant
+            },
             streamingStatus = WorkshopStreamingStatus.Idle,
             errorMessage = event.message,
         )

@@ -202,10 +202,7 @@ class WorkshopAssistantStreamReducerTest {
             ),
         )
 
-        val assistant = failed.messages.single().assistant!!
-        assertEquals(WorkshopAssistantPhase.Failed, assistant.phase)
-        assertEquals("boom", assistant.failureMessage)
-        assertFalse(failed.messages.single().isStreaming)
+        assertTrue(failed.messages.isEmpty())
         assertEquals(WorkshopStreamingStatus.Idle, failed.streamingStatus)
         assertEquals("boom", failed.errorMessage)
     }
