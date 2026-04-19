@@ -133,4 +133,32 @@ class WorkshopAssistantStreamSourceTest {
         val complete = events.last() as WorkshopAssistantStreamEvent.Complete
         assertEquals("A gate opened", complete.finalMarkdown)
     }
+
+    @Test
+    fun defaultSource_doesNotEmitChoicesWhenAuthoritativeFinalMarkdownIsBlank() = runTest {
+        val source = DefaultWorkshopAssistantStreamSource(
+            inferenceEngine = object : InferenceEngine {
+                override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
+                    emit(GenerationEvent.Final(""))
+                }
+            },
+            choiceBuilder = WorkshopChoiceBuilder(),
+        )
+
+        val events = source.stream(
+            request = GenerationRequest(
+                projectId = "project",
+                templateId = "template",
+                actionType = "chat",
+                userPrompt = "Continue scene",
+                manuscriptExcerpt = "Excerpt",
+                promptBlocks = emptyList(),
+            ),
+            generationId = 11,
+        ).toList()
+
+        assertTrue(events.none { it is WorkshopAssistantStreamEvent.ChoicesReplace })
+        val complete = events.last() as WorkshopAssistantStreamEvent.Complete
+        assertEquals("", complete.finalMarkdown)
+    }
 }

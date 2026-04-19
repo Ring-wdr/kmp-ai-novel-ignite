@@ -185,6 +185,44 @@ class ChatPanelTest {
     }
 
     @Test
+    fun latestChoices_areHiddenWhenAssistantBodyIsBlank() {
+        rule.setContent {
+            ChatPanel(
+                messages = listOf(
+                    WorkshopChatMessage.assistant(
+                        id = "assistant-blank",
+                        text = "",
+                        isStreaming = false,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-blank",
+                                    label = "Continue scene",
+                                    prompt = "Continue the scene from the checkpoint.",
+                                    style = WorkshopChoiceStyle.Primary,
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Completed,
+                        ),
+                    ),
+                ),
+                chatInputText = "",
+                streamingStatus = WorkshopStreamingStatus.Idle,
+                errorMessage = null,
+                onChatInputChange = {},
+                onSendChatMessage = {},
+                onUseChoice = {},
+                onContinueScene = {},
+                onAbortGeneration = {},
+            )
+        }
+
+        rule.onAllNodesWithTag("workshop-choice-choice-blank", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
     fun latestStreamingChoice_surfaceIsDisabledAndOldChoicesStayHidden() {
         rule.setContent {
             ChatPanel(

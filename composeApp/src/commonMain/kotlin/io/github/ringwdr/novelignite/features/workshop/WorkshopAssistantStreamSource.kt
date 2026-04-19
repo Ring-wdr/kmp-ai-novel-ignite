@@ -60,12 +60,14 @@ class DefaultWorkshopAssistantStreamSource(
                             )
                         )
                     }
-                    emit(
-                        WorkshopAssistantStreamEvent.ChoicesReplace(
-                            messageId = messageId,
-                            choices = choiceBuilder.build(finalMarkdown),
+                    finalMarkdown.takeIf { it.isNotBlank() }?.let { authoritativeMarkdown ->
+                        emit(
+                            WorkshopAssistantStreamEvent.ChoicesReplace(
+                                messageId = messageId,
+                                choices = choiceBuilder.build(authoritativeMarkdown),
+                            )
                         )
-                    )
+                    }
                     emit(
                         WorkshopAssistantStreamEvent.Complete(
                             messageId = messageId,

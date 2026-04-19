@@ -119,7 +119,7 @@ internal fun WorkshopChatTimeline(
                                                 modifier = Modifier.fillMaxWidth(),
                                             )
                                         }
-                                        val showChoices = message.id == latestChoiceMessageId
+                                        val showChoices = message.id == latestChoiceMessageId && bubbleText.isNotBlank()
                                         if (showChoices) {
                                             assistant?.choices
                                             .orEmpty()
