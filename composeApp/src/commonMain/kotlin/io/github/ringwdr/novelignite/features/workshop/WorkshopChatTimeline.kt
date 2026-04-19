@@ -19,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -34,6 +36,7 @@ internal fun WorkshopChatTimeline(
 ) {
     val listState = rememberLazyListState()
     val latestMessage = messages.lastOrNull()
+    val latestAssistantMessageId = messages.lastOrNull { it.role == WorkshopMessageRole.Assistant }?.id
 
     LaunchedEffect(
         latestMessage?.id,
@@ -115,7 +118,9 @@ internal fun WorkshopChatTimeline(
                                                 modifier = Modifier.fillMaxWidth(),
                                             )
                                         }
-                                        assistant?.choices
+                                        val showChoices = message.id == latestAssistantMessageId
+                                        if (showChoices) {
+                                            assistant?.choices
                                             .orEmpty()
                                             .takeIf { it.isNotEmpty() }
                                             ?.let { choices ->
@@ -127,7 +132,9 @@ internal fun WorkshopChatTimeline(
                                                             WorkshopChoiceStyle.Primary -> Button(
                                                                 onClick = { onUseChoice(choice.prompt) },
                                                                 enabled = !isStreaming,
-                                                                modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
+                                                                modifier = Modifier
+                                                                    .testTag(workshopChoiceButtonTag(choice.id))
+                                                                    .semantics { contentDescription = choice.label },
                                                             ) {
                                                                 Text(choice.label)
                                                             }
@@ -135,7 +142,9 @@ internal fun WorkshopChatTimeline(
                                                             WorkshopChoiceStyle.Secondary -> OutlinedButton(
                                                                 onClick = { onUseChoice(choice.prompt) },
                                                                 enabled = !isStreaming,
-                                                                modifier = Modifier.testTag(workshopChoiceButtonTag(choice.id)),
+                                                                modifier = Modifier
+                                                                    .testTag(workshopChoiceButtonTag(choice.id))
+                                                                    .semantics { contentDescription = choice.label },
                                                             ) {
                                                                 Text(choice.label)
                                                             }
@@ -143,6 +152,7 @@ internal fun WorkshopChatTimeline(
                                                     }
                                                 }
                                             }
+                                        }
                                     }
                                 }
                             }

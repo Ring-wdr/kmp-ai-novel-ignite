@@ -3,10 +3,13 @@ package io.github.ringwdr.novelignite.features.workshop
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -57,6 +60,23 @@ class ChatPanelTest {
             ChatPanel(
                 messages = listOf(
                     WorkshopChatMessage.assistant(
+                        id = "assistant-old",
+                        text = "",
+                        isStreaming = false,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "Earlier answer.",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-old",
+                                    label = "Old follow-up",
+                                    prompt = "Use the old follow-up.",
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Completed,
+                        ),
+                    ),
+                    WorkshopChatMessage.assistant(
                         id = "assistant-1",
                         text = "",
                         isStreaming = false,
@@ -91,9 +111,10 @@ class ChatPanelTest {
             )
         }
 
-        rule.onNodeWithTag(WORKSHOP_ASSISTANT_MARKDOWN_TAG).assertExists()
-        rule.onNodeWithTag("workshop-choice-choice-1").assertExists()
-        rule.onNodeWithTag("workshop-choice-choice-2").assertExists()
+        rule.onNodeWithContentDescription("Bold response Pick a path.").assertExists()
+        rule.onNodeWithContentDescription("Continue scene").assertExists()
+        rule.onNodeWithContentDescription("Shift perspective").assertExists()
+        rule.onAllNodesWithTag("workshop-choice-choice-old").assertCountEquals(0)
     }
 
     @Test
@@ -104,7 +125,7 @@ class ChatPanelTest {
             ChatPanel(
                 messages = listOf(
                     WorkshopChatMessage.assistant(
-                        id = "assistant-1",
+                        id = "assistant-2",
                         text = "",
                         isStreaming = false,
                     ).copy(
@@ -121,8 +142,50 @@ class ChatPanelTest {
                             phase = WorkshopAssistantPhase.Completed,
                         ),
                     ),
+                ),
+                chatInputText = "",
+                streamingStatus = WorkshopStreamingStatus.Idle,
+                errorMessage = null,
+                onChatInputChange = {},
+                onSendChatMessage = {},
+                onUseChoice = { receivedPrompt = it },
+                onContinueScene = {},
+                onAbortGeneration = {},
+            )
+        }
+
+        rule.onNodeWithContentDescription("Try this next.").assertExists()
+        rule.onNodeWithContentDescription("Continue scene").assertExists()
+        rule.onNodeWithTag("workshop-choice-choice-1").performClick()
+        rule.runOnIdle {
+            assertEquals("Continue the scene from the checkpoint.", receivedPrompt)
+        }
+    }
+
+    @Test
+    fun latestStreamingChoice_surfaceIsDisabledAndOldChoicesStayHidden() {
+        rule.setContent {
+            ChatPanel(
+                messages = listOf(
                     WorkshopChatMessage.assistant(
-                        id = "assistant-2",
+                        id = "assistant-old",
+                        text = "",
+                        isStreaming = false,
+                    ).copy(
+                        assistant = WorkshopAssistantTurn(
+                            renderedMarkdown = "Older answer.",
+                            choices = listOf(
+                                WorkshopChoice(
+                                    id = "choice-old",
+                                    label = "Old follow-up",
+                                    prompt = "Use the old follow-up.",
+                                ),
+                            ),
+                            phase = WorkshopAssistantPhase.Completed,
+                        ),
+                    ),
+                    WorkshopChatMessage.assistant(
+                        id = "assistant-latest",
                         text = "",
                         isStreaming = true,
                     ).copy(
@@ -130,7 +193,7 @@ class ChatPanelTest {
                             renderedMarkdown = "Still streaming.",
                             choices = listOf(
                                 WorkshopChoice(
-                                    id = "choice-2",
+                                    id = "choice-latest",
                                     label = "Shift perspective",
                                     prompt = "Shift the perspective around the checkpoint.",
                                 ),
@@ -145,18 +208,16 @@ class ChatPanelTest {
                 errorMessage = null,
                 onChatInputChange = {},
                 onSendChatMessage = {},
-                onUseChoice = { receivedPrompt = it },
+                onUseChoice = {},
                 onContinueScene = {},
                 onAbortGeneration = {},
             )
         }
 
-        rule.onNodeWithTag("workshop-choice-choice-1").performClick()
-        rule.runOnIdle {
-            assertEquals("Continue the scene from the checkpoint.", receivedPrompt)
-        }
-
-        rule.onNodeWithTag("workshop-choice-choice-2").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Still streaming.").assertExists()
+        rule.onNodeWithContentDescription("Shift perspective").assertExists()
+        rule.onNodeWithTag("workshop-choice-choice-latest").assertIsNotEnabled()
+        rule.onAllNodesWithTag("workshop-choice-choice-old").assertCountEquals(0)
     }
 
     @Test
