@@ -106,6 +106,36 @@ class WorkshopAssistantStreamReducerTest {
     }
 
     @Test
+    fun metadataPatch_updatesStreamingAssistantMetadata() {
+        val base = WorkshopUiState(
+            messages = listOf(
+                WorkshopChatMessage.assistant(
+                    id = "generation-1-assistant",
+                    assistant = WorkshopAssistantTurn(
+                        renderedMarkdown = "Draft",
+                        phase = WorkshopAssistantPhase.Streaming,
+                    ),
+                    isStreaming = true,
+                ),
+            ),
+            streamingStatus = WorkshopStreamingStatus.Streaming,
+        )
+
+        val updated = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.MetadataPatch(
+                messageId = "generation-1-assistant",
+                title = "Scene pulse",
+                badge = "Drafting",
+            ),
+        )
+
+        assertEquals("Scene pulse", updated.messages.single().assistant?.metadata?.title)
+        assertEquals("Drafting", updated.messages.single().assistant?.metadata?.badge)
+        assertEquals(base.messages.single().assistant?.renderedMarkdown, updated.messages.single().assistant?.renderedMarkdown)
+    }
+
+    @Test
     fun choicesReplace_overwritesPreviousChoiceSurface() {
         val base = WorkshopUiState(
             messages = listOf(
@@ -179,7 +209,7 @@ class WorkshopAssistantStreamReducerTest {
     }
 
     @Test
-    fun error_marksAssistantTurnFailedAndKeepsTypedState() {
+    fun error_removesMatchingStreamingAssistantTurn() {
         val base = WorkshopUiState(
             messages = listOf(
                 WorkshopChatMessage.assistant(
@@ -205,5 +235,84 @@ class WorkshopAssistantStreamReducerTest {
         assertTrue(failed.messages.isEmpty())
         assertEquals(WorkshopStreamingStatus.Idle, failed.streamingStatus)
         assertEquals("boom", failed.errorMessage)
+    }
+
+    @Test
+    fun complete_ignoresWrongIdAndLeavesActiveStreamUntouched() {
+        val base = WorkshopAssistantStreamReducer.apply(
+            state = WorkshopUiState(),
+            event = WorkshopAssistantStreamEvent.Start(
+                requestId = "request-1",
+                messageId = "generation-1-assistant",
+            ),
+        )
+
+        val updated = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.Complete(messageId = "generation-2-assistant"),
+        )
+
+        assertEquals(base, updated)
+    }
+
+    @Test
+    fun complete_ignoresDuplicateTerminalEventAfterCompletion() {
+        val started = WorkshopAssistantStreamReducer.apply(
+            state = WorkshopUiState(),
+            event = WorkshopAssistantStreamEvent.Start(
+                requestId = "request-1",
+                messageId = "generation-1-assistant",
+            ),
+        )
+        val completed = WorkshopAssistantStreamReducer.apply(
+            state = started,
+            event = WorkshopAssistantStreamEvent.Complete(messageId = "generation-1-assistant"),
+        )
+
+        val duplicate = WorkshopAssistantStreamReducer.apply(
+            state = completed,
+            event = WorkshopAssistantStreamEvent.Complete(messageId = "generation-1-assistant"),
+        )
+
+        assertEquals(completed, duplicate)
+    }
+
+    @Test
+    fun abortAck_ignoresWrongIdAndLeavesActiveStreamUntouched() {
+        val base = WorkshopAssistantStreamReducer.apply(
+            state = WorkshopUiState(),
+            event = WorkshopAssistantStreamEvent.Start(
+                requestId = "request-1",
+                messageId = "generation-1-assistant",
+            ),
+        )
+
+        val updated = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.AbortAck(messageId = "generation-2-assistant"),
+        )
+
+        assertEquals(base, updated)
+    }
+
+    @Test
+    fun error_ignoresWrongIdAndLeavesActiveStreamUntouched() {
+        val base = WorkshopAssistantStreamReducer.apply(
+            state = WorkshopUiState(),
+            event = WorkshopAssistantStreamEvent.Start(
+                requestId = "request-1",
+                messageId = "generation-1-assistant",
+            ),
+        )
+
+        val updated = WorkshopAssistantStreamReducer.apply(
+            state = base,
+            event = WorkshopAssistantStreamEvent.Error(
+                messageId = "generation-2-assistant",
+                message = "boom",
+            ),
+        )
+
+        assertEquals(base, updated)
     }
 }
