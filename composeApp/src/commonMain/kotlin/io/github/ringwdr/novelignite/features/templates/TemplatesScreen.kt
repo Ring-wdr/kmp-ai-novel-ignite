@@ -2,12 +2,10 @@ package io.github.ringwdr.novelignite.features.templates
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -82,33 +80,12 @@ fun TemplatesScreen() {
         modifier = Modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = "Templates",
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text("Author reusable prompt blocks and remix them locally.")
         if (remixBanner != null) {
             Text(
                 text = "Loaded remix from ${remixBanner.orEmpty()}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
-        }
-
-        if (activeTemplate != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Workshop active: ${activeTemplate?.title.orEmpty()}",
-                    modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Medium,
-                )
-                OutlinedButton(onClick = ActiveWorkshopTemplateStore::clear) {
-                    Text("Clear")
-                }
-            }
         }
 
         TemplateEditorCard(
