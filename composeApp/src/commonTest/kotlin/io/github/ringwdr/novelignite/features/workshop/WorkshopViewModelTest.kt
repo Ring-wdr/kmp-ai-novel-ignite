@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,7 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkshopViewModelTest {
@@ -693,6 +695,27 @@ class WorkshopViewModelTest {
 
         assertEquals(listOf("first", "second"), persistedDrafts)
     }
+
+    @Test
+    fun updateDraft_persistsSnapshotsInLogicalOrder_evenIfDispatcherPrefersLatestTask() {
+        val dispatcher = ReorderingDispatcher()
+        val persistedDrafts = mutableListOf<String>()
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val viewModel = WorkshopViewModel(
+            streamSource = source { _, _ -> },
+            persistState = { state -> persistedDrafts += state.draftText },
+            scope = scope,
+        )
+
+        viewModel.updateDraft("first")
+        viewModel.updateDraft("second")
+
+        dispatcher.runLast()
+        dispatcher.runAll()
+
+        assertEquals(listOf("first", "second"), persistedDrafts)
+        viewModel.clear()
+    }
 }
 
 private fun newViewModel(
@@ -702,15 +725,16 @@ private fun newViewModel(
     templatePromptBlocks: List<String> = emptyList(),
     initialState: WorkshopUiState = WorkshopUiState(),
     persistState: suspend (WorkshopUiState) -> Unit = {},
+    scope: CoroutineScope? = null,
 ): WorkshopViewModel {
-    val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+    val activeScope = scope ?: CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
     return WorkshopViewModel(
         streamSource = streamSource,
         templateId = templateId,
         templatePromptBlocks = templatePromptBlocks,
         initialState = initialState,
         persistState = persistState,
-        scope = scope,
+        scope = activeScope,
     )
 }
 
@@ -731,4 +755,22 @@ private fun recordingSource(
 ): WorkshopAssistantStreamSource = source { request, generationId ->
     requests += request
     block(request, generationId)
+}
+
+private class ReorderingDispatcher : CoroutineDispatcher() {
+    private val queuedTasks = ArrayDeque<Runnable>()
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        queuedTasks.addLast(block)
+    }
+
+    fun runLast() {
+        queuedTasks.removeLastOrNull()?.run()
+    }
+
+    fun runAll() {
+        while (queuedTasks.isNotEmpty()) {
+            queuedTasks.removeFirst().run()
+        }
+    }
 }

@@ -8,12 +8,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 class WorkshopViewModel(
     private val streamSource: WorkshopAssistantStreamSource,
@@ -28,8 +27,16 @@ class WorkshopViewModel(
     private var activeGenerationId = 0
     private var activeAssistantMessageId: String? = null
     private var activeGenerationJob: Job? = null
-    private val persistMutex = Mutex()
+    private val persistQueue = Channel<WorkshopUiState>(capacity = Channel.UNLIMITED)
     val state: StateFlow<WorkshopUiState> = _state
+
+    init {
+        scope.launch {
+            for (snapshot in persistQueue) {
+                persistState(snapshot)
+            }
+        }
+    }
 
     fun updateDraft(text: String) {
         _state.update { it.copy(draftText = text) }
@@ -152,12 +159,7 @@ class WorkshopViewModel(
     }
 
     private fun persistCurrentState() {
-        val snapshot = _state.value
-        scope.launch {
-            persistMutex.withLock {
-                persistState(snapshot)
-            }
-        }
+        persistQueue.trySend(_state.value)
     }
 
     private fun handleAssistantStreamEvent(
