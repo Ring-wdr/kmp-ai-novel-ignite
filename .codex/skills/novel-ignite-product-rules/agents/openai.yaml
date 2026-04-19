@@ -1,0 +1,4 @@
+interface:
+  display_name: "Novel Ignite Rules"
+  short_description: "Novel Ignite product behavior rules"
+  default_prompt: "Use $novel-ignite-product-rules when changing Workshop, Templates, Board, or inference behavior in this repository."
