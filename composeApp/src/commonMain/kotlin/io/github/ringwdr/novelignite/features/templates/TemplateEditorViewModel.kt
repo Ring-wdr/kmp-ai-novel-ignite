@@ -82,7 +82,12 @@ class TemplateEditorViewModel {
     }
 
     fun applyEnrichedDraft(draft: TemplateDraft) {
-        loadDraft(draft)
+        state.value = TemplateEditorState(
+            title = draft.title,
+            genre = draft.genre,
+            premise = draft.premise,
+            promptBlocks = draft.promptBlocks,
+        )
     }
 
     fun snapshotDraft(): TemplateDraft = state.value.toDraft()

@@ -25,6 +25,17 @@ class TemplatesScreenStateTest {
     }
 
     @Test
+    fun returnToList_clearsEditorMetadata_afterEditFlow() {
+        val state = TemplatesScreenState()
+            .openEdit(templateId = 7L)
+            .returnToList()
+
+        assertEquals(TemplatesSurface.List, state.surface)
+        assertEquals(TemplateEditorMode.Create, state.editorMode)
+        assertNull(state.editingTemplateId)
+    }
+
+    @Test
     fun onSaveSuccess_returnsToList_withHighlightAndFeedback() {
         val state = TemplatesScreenState(
             surface = TemplatesSurface.Editor,

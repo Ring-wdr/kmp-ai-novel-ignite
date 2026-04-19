@@ -36,6 +36,8 @@ internal data class TemplatesScreenState(
 
     fun returnToList(): TemplatesScreenState = copy(
         surface = TemplatesSurface.List,
+        editorMode = TemplateEditorMode.Create,
+        editingTemplateId = null,
         remixBanner = null,
     )
 
