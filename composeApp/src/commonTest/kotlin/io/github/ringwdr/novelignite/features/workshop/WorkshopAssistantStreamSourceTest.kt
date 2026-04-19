@@ -17,9 +17,9 @@ class WorkshopAssistantStreamSourceTest {
         val source = DefaultWorkshopAssistantStreamSource(
             inferenceEngine = object : InferenceEngine {
                 override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flow {
-                    emit(GenerationEvent.Token("## Gate"))
-                    emit(GenerationEvent.Token("\n\nThe wind answered."))
-                    emit(GenerationEvent.Final("## Gate\n\nThe wind answered."))
+                    emit(GenerationEvent.Token("The gate opened."))
+                    emit(GenerationEvent.Token(" A silver wind answered."))
+                    emit(GenerationEvent.Final("The gate opened. A silver wind answered. Then a chorus answered."))
                 }
             },
             choiceBuilder = WorkshopChoiceBuilder(),
@@ -37,20 +37,20 @@ class WorkshopAssistantStreamSourceTest {
             generationId = 7,
         ).toList()
 
-        assertEquals(5, events.size)
+        assertEquals(6, events.size)
 
         val start = events[0] as WorkshopAssistantStreamEvent.Start
         assertEquals("request-7", start.requestId)
         assertEquals("generation-7-assistant", start.messageId)
 
         assertEquals(
-            listOf("## Gate", "\n\nThe wind answered."),
+            listOf("The gate opened.", " A silver wind answered.", " Then a chorus answered."),
             events.filterIsInstance<WorkshopAssistantStreamEvent.MarkdownDelta>().map { it.markdown },
         )
 
         val choices = events.filterIsInstance<WorkshopAssistantStreamEvent.ChoicesReplace>().single().choices
         assertEquals(3, choices.size)
-        assertTrue(choices.first().prompt.contains("Gate"))
+        assertTrue(choices.first().prompt.contains("chorus answered"))
         assertTrue(events.last() is WorkshopAssistantStreamEvent.Complete)
     }
 

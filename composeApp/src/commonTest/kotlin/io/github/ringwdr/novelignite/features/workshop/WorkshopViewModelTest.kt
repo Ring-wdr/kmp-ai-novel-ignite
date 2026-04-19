@@ -127,6 +127,35 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun sendChatMessage_usesFinalAuthoritativeMarkdownAfterTokens() = runTest {
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), messageId))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "## Gate"))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "\n\nThe wind answered."))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "\n\nA silver wind answered."))
+                emit(WorkshopAssistantStreamEvent.ChoicesReplace(messageId, WorkshopChoiceBuilder().build("## Gate\n\nThe wind answered.\n\nA silver wind answered.")))
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
+            },
+        )
+
+        viewModel.updateChatInput("Continue the scene")
+        viewModel.sendChatMessage()
+        runCurrent()
+
+        val assistant = viewModel.state.value.messages.last().assistant!!
+        assertEquals("## Gate\n\nThe wind answered.\n\nA silver wind answered.", assistant.renderedMarkdown)
+        assertEquals(
+            listOf("Continue scene", "Deepen tension", "Shift perspective"),
+            assistant.choices.map { it.label },
+        )
+        assertEquals(WorkshopAssistantPhase.Completed, assistant.phase)
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
+    }
+
+    @Test
     fun abortGeneration_entersRecoveringUntilCollectorFinishes_thenAllowsRetry() = runTest {
         val release = Channel<Unit>()
         val requests = mutableListOf<GenerationRequest>()

@@ -46,11 +46,17 @@ class DefaultWorkshopAssistantStreamSource(
 
                 is GenerationEvent.Final -> {
                     val finalMarkdown = event.text.ifBlank { streamedMarkdown.toString() }
-                    if (streamedMarkdown.isEmpty() && finalMarkdown.isNotBlank()) {
+                    val finalDelta = when {
+                        streamedMarkdown.isEmpty() -> finalMarkdown
+                        finalMarkdown.startsWith(streamedMarkdown.toString()) ->
+                            finalMarkdown.removePrefix(streamedMarkdown.toString())
+                        else -> finalMarkdown
+                    }
+                    if (finalDelta.isNotBlank()) {
                         emit(
                             WorkshopAssistantStreamEvent.MarkdownDelta(
                                 messageId = messageId,
-                                markdown = finalMarkdown,
+                                markdown = finalDelta,
                             )
                         )
                     }
