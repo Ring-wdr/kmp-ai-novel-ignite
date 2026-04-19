@@ -31,15 +31,24 @@ data class WorkshopChatMessage(
                 text = text,
             )
 
+        fun assistant(
+            id: String,
+            assistant: WorkshopAssistantTurn,
+            isStreaming: Boolean = assistant.phase == WorkshopAssistantPhase.Streaming,
+        ): WorkshopChatMessage =
+            WorkshopChatMessage(
+                id = id,
+                role = WorkshopMessageRole.Assistant,
+                text = assistant.renderedMarkdown,
+                assistant = assistant,
+                isStreaming = isStreaming,
+            )
+
         fun assistant(id: String, text: String, isStreaming: Boolean = false): WorkshopChatMessage =
             WorkshopChatMessage(
                 id = id,
                 role = WorkshopMessageRole.Assistant,
                 text = text,
-                assistant = WorkshopAssistantTurn(
-                    renderedMarkdown = text,
-                    phase = if (isStreaming) WorkshopAssistantPhase.Streaming else WorkshopAssistantPhase.Completed,
-                ),
                 isStreaming = isStreaming,
             )
     }

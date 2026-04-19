@@ -35,10 +35,8 @@ class WorkshopAssistantStreamReducerTest {
     fun choicesReplace_overwritesPreviousChoiceSurface() {
         val base = WorkshopUiState(
             messages = listOf(
-                WorkshopChatMessage(
+                WorkshopChatMessage.assistant(
                     id = "generation-1-assistant",
-                    role = WorkshopMessageRole.Assistant,
-                    text = "Scene",
                     assistant = WorkshopAssistantTurn(
                         renderedMarkdown = "Scene",
                         choices = listOf(
@@ -82,10 +80,8 @@ class WorkshopAssistantStreamReducerTest {
     fun complete_freezesAssistantTurnAndClearsStreamingFlag() {
         val base = WorkshopUiState(
             messages = listOf(
-                WorkshopChatMessage(
+                WorkshopChatMessage.assistant(
                     id = "generation-1-assistant",
-                    role = WorkshopMessageRole.Assistant,
-                    text = "Draft",
                     assistant = WorkshopAssistantTurn(
                         renderedMarkdown = "Draft",
                         phase = WorkshopAssistantPhase.Streaming,

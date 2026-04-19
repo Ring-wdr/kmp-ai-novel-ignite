@@ -46,15 +46,17 @@ private fun List<WorkshopPersistedMessage>.toUiMessages(): List<WorkshopChatMess
 }
 
 private fun WorkshopPersistedMessage.toUiMessage(): WorkshopChatMessage =
-    if (role == WorkshopMessageRole.Assistant) {
-        WorkshopChatMessage.assistant(id = id, text = text, isStreaming = false)
-    } else {
-        WorkshopChatMessage.user(id = id, text = text)
-    }
+    WorkshopChatMessage(
+        id = id,
+        role = role,
+        text = text,
+        isStreaming = false,
+    )
 
 private fun WorkshopPersistedMessage.toUiMessage(id: String): WorkshopChatMessage =
-    if (role == WorkshopMessageRole.Assistant) {
-        WorkshopChatMessage.assistant(id = id, text = text, isStreaming = false)
-    } else {
-        WorkshopChatMessage.user(id = id, text = text)
-    }
+    WorkshopChatMessage(
+        id = id,
+        role = role,
+        text = text,
+        isStreaming = false,
+    )
