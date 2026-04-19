@@ -278,6 +278,26 @@ class WorkshopAssistantStreamReducerTest {
     }
 
     @Test
+    fun abortAck_removesAssistantTurnAndReturnsToIdle() {
+        val started = WorkshopAssistantStreamReducer.apply(
+            state = WorkshopUiState(),
+            event = WorkshopAssistantStreamEvent.Start(
+                requestId = "request-1",
+                messageId = "generation-1-assistant",
+            ),
+        )
+
+        val aborted = WorkshopAssistantStreamReducer.apply(
+            state = started,
+            event = WorkshopAssistantStreamEvent.AbortAck(messageId = "generation-1-assistant"),
+        )
+
+        assertTrue(aborted.messages.isEmpty())
+        assertEquals(WorkshopStreamingStatus.Idle, aborted.streamingStatus)
+        assertFalse(aborted.isGenerating)
+    }
+
+    @Test
     fun abortAck_ignoresWrongIdAndLeavesActiveStreamUntouched() {
         val base = WorkshopAssistantStreamReducer.apply(
             state = WorkshopUiState(),

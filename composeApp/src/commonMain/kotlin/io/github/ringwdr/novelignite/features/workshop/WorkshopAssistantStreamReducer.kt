@@ -57,7 +57,9 @@ object WorkshopAssistantStreamReducer {
             streamingStatus = WorkshopStreamingStatus.Idle,
         ) ?: state
 
-        is WorkshopAssistantStreamEvent.AbortAck -> state.removeStreamingAssistant(event.messageId) ?: state
+        is WorkshopAssistantStreamEvent.AbortAck -> state.removeStreamingAssistant(event.messageId)?.copy(
+            streamingStatus = WorkshopStreamingStatus.Idle,
+        ) ?: state
 
         is WorkshopAssistantStreamEvent.Error -> state.removeStreamingAssistant(event.messageId)?.copy(
             streamingStatus = WorkshopStreamingStatus.Idle,
