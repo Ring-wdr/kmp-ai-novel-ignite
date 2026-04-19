@@ -58,7 +58,7 @@ Desktop에서 typed stream fixture 경로를 수동 검증하려면 `NOVEL_IGNIT
 - `./gradlew.bat :composeApp:jvmTest`
 - `./gradlew.bat :relay:test`
 
-Task 12의 원래 계획 문서에서는 Desktop 검증 단계를 `desktopTest`로 표현했지만, 현재 wizard scaffold는 `composeApp/src/desktopTest/kotlin`을 Gradle의 `jvmTest`에 연결합니다. 따라서 이 브랜치에서 Desktop smoke test를 실제로 실행할 때는 `./gradlew.bat :composeApp:jvmTest --tests "io.github.ringwdr.novelignite.smoke.AppSmokeTest"` 또는 `./gradlew.bat :composeApp:jvmTest`를 사용합니다.
+Task 12의 원래 계획 문서에서는 Desktop 검증 단계를 `desktopTest`로 표현했지만, 현재 wizard scaffold는 `composeApp/src/desktopTest/kotlin`을 Gradle의 `jvmTest`에 연결합니다. 따라서 이 브랜치에서 Desktop smoke test를 실제로 실행할 때는 `./gradlew.bat :composeApp:jvmTest --tests "io.github.ringwdr.novelignite.features.workshop.WorkshopTypedStreamPrototypeSmokeTest"` 또는 `./gradlew.bat :composeApp:jvmTest`를 사용합니다.
 
 ## 구현 원칙
 

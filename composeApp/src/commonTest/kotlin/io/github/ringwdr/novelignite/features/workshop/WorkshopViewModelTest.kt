@@ -127,6 +127,40 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun useChoice_includesTypedChoicePromptAndUsesChatActionType() = runTest {
+        val requests = mutableListOf<GenerationRequest>()
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = recordingSource(requests) { _, generationId ->
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), workshopGenerationAssistantMessageId(generationId)))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(workshopGenerationAssistantMessageId(generationId), "Choice follow-up."))
+                emit(WorkshopAssistantStreamEvent.Complete(workshopGenerationAssistantMessageId(generationId)))
+            },
+        )
+
+        viewModel.useChoice("Continue the scene from the checkpoint.")
+        runCurrent()
+
+        assertEquals(1, requests.size)
+        assertEquals("chat", requests.single().actionType)
+        assertEquals("Continue the scene from the checkpoint.", requests.single().userPrompt)
+        assertEquals(
+            listOf(
+                WorkshopChatMessage.user(
+                    id = "generation-1-user",
+                    text = "Continue the scene from the checkpoint.",
+                ),
+                WorkshopChatMessage.assistant(
+                    id = "generation-1-assistant",
+                    text = "Choice follow-up.",
+                    isStreaming = false,
+                ),
+            ),
+            viewModel.state.value.messages,
+        )
+    }
+
+    @Test
     fun sendChatMessage_usesFinalAuthoritativeMarkdownAfterTokens() = runTest {
         val viewModel = newViewModel(
             testScheduler = testScheduler,
