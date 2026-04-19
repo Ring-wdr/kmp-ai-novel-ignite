@@ -3,10 +3,12 @@ package io.github.ringwdr.novelignite.features.workshop
 import io.github.ringwdr.novelignite.domain.inference.GenerationRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -21,6 +23,8 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -700,11 +704,18 @@ class WorkshopViewModelTest {
     fun updateDraft_persistsSnapshotsInLogicalOrder_evenIfDispatcherPrefersLatestTask() {
         val dispatcher = ReorderingDispatcher()
         val persistedDrafts = mutableListOf<String>()
+        val secondPersisted = Channel<Unit>(capacity = 1)
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val viewModel = WorkshopViewModel(
             streamSource = source { _, _ -> },
-            persistState = { state -> persistedDrafts += state.draftText },
+            persistState = { state ->
+                persistedDrafts += state.draftText
+                if (state.draftText == "second") {
+                    secondPersisted.trySend(Unit)
+                }
+            },
             scope = scope,
+            persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
         )
 
         viewModel.updateDraft("first")
@@ -713,8 +724,92 @@ class WorkshopViewModelTest {
         dispatcher.runLast()
         dispatcher.runAll()
 
+        runBlocking {
+            withTimeout(5_000) {
+                secondPersisted.receive()
+            }
+        }
         assertEquals(listOf("first", "second"), persistedDrafts)
         viewModel.clear()
+    }
+
+    @Test
+    fun updateDraft_continuesPersistingAfterPersistFailure() = runTest {
+        val persistedDrafts = mutableListOf<String>()
+        val secondPersisted = Channel<Unit>(capacity = 1)
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, _ -> },
+            persistState = { state ->
+                if (state.draftText == "first") {
+                    throw IllegalStateException("boom")
+                }
+                persistedDrafts += state.draftText
+                if (state.draftText == "second") {
+                    secondPersisted.send(Unit)
+                }
+            },
+            persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
+
+        viewModel.updateDraft("first")
+        viewModel.updateDraft("second")
+
+        withTimeout(5_000) {
+            secondPersisted.receive()
+        }
+
+        assertEquals(listOf("second"), persistedDrafts)
+        viewModel.clear()
+    }
+
+    @Test
+    fun clear_drainsQueuedPersistenceBeforeReturning() = runTest {
+        val firstPersistEntered = Channel<Unit>(capacity = 1)
+        val releaseFirstPersist = Channel<Unit>(capacity = 1)
+        val secondPersisted = Channel<Unit>(capacity = 1)
+        val persistedDrafts = mutableListOf<String>()
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, _ -> },
+            persistState = { state ->
+                persistedDrafts += state.draftText
+                when (state.draftText) {
+                    "first" -> {
+                        firstPersistEntered.send(Unit)
+                        releaseFirstPersist.receive()
+                    }
+
+                    "second" -> secondPersisted.send(Unit)
+                }
+            },
+            persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
+
+        viewModel.updateDraft("first")
+        withTimeout(5_000) {
+            firstPersistEntered.receive()
+        }
+        viewModel.updateDraft("second")
+
+        val clearStarted = Channel<Unit>(capacity = 1)
+        val clearJob = async(Dispatchers.Default) {
+            clearStarted.send(Unit)
+            viewModel.clear()
+        }
+
+        withTimeout(5_000) {
+            clearStarted.receive()
+        }
+        assertFalse(clearJob.isCompleted)
+
+        releaseFirstPersist.send(Unit)
+        withTimeout(5_000) {
+            secondPersisted.receive()
+        }
+        clearJob.await()
+
+        assertEquals(listOf("first", "second"), persistedDrafts)
     }
 }
 
@@ -726,8 +821,10 @@ private fun newViewModel(
     initialState: WorkshopUiState = WorkshopUiState(),
     persistState: suspend (WorkshopUiState) -> Unit = {},
     scope: CoroutineScope? = null,
+    persistenceScope: CoroutineScope? = null,
 ): WorkshopViewModel {
     val activeScope = scope ?: CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+    val activePersistenceScope = persistenceScope ?: activeScope
     return WorkshopViewModel(
         streamSource = streamSource,
         templateId = templateId,
@@ -735,6 +832,7 @@ private fun newViewModel(
         initialState = initialState,
         persistState = persistState,
         scope = activeScope,
+        persistenceScope = activePersistenceScope,
     )
 }
 

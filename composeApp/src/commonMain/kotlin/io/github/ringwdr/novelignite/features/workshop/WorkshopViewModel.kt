@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class WorkshopViewModel(
     private val streamSource: WorkshopAssistantStreamSource,
@@ -21,6 +22,7 @@ class WorkshopViewModel(
     initialState: WorkshopUiState = WorkshopUiState(),
     private val persistState: suspend (WorkshopUiState) -> Unit = {},
     private val scope: CoroutineScope = defaultWorkshopScope(),
+    private val persistenceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     private val _state = MutableStateFlow(initialState)
     private var nextGenerationId = initialState.restoredGenerationIdFloor()
@@ -28,12 +30,17 @@ class WorkshopViewModel(
     private var activeAssistantMessageId: String? = null
     private var activeGenerationJob: Job? = null
     private val persistQueue = Channel<WorkshopUiState>(capacity = Channel.UNLIMITED)
+    private val persistenceConsumerJob: Job
     val state: StateFlow<WorkshopUiState> = _state
 
     init {
-        scope.launch {
+        persistenceConsumerJob = persistenceScope.launch {
             for (snapshot in persistQueue) {
-                persistState(snapshot)
+                try {
+                    persistState(snapshot)
+                } catch (_: Throwable) {
+                    // Keep persistence alive so a single failed save does not permanently stop later writes.
+                }
             }
         }
     }
@@ -76,6 +83,11 @@ class WorkshopViewModel(
 
     fun clear() {
         scope.cancel()
+        persistQueue.close()
+        runBlocking {
+            persistenceConsumerJob.join()
+        }
+        persistenceScope.cancel()
     }
 
     private fun startGeneration(
