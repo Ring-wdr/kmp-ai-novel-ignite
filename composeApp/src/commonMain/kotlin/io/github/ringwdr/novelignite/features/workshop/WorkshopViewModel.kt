@@ -21,9 +21,11 @@ class WorkshopViewModel(
     private val templatePromptBlocks: List<String> = emptyList(),
     initialState: WorkshopUiState = WorkshopUiState(),
     private val persistState: suspend (WorkshopUiState) -> Unit = {},
-    private val scope: CoroutineScope = defaultWorkshopScope(),
-    private val persistenceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    scope: CoroutineScope? = null,
+    persistenceScope: CoroutineScope? = null,
 ) {
+    private val activeScope = scope ?: defaultWorkshopScope()
+    private val activePersistenceScope = persistenceScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(initialState)
     private var nextGenerationId = initialState.restoredGenerationIdFloor()
     private var activeGenerationId = 0
@@ -35,7 +37,7 @@ class WorkshopViewModel(
     val state: StateFlow<WorkshopUiState> = _state
 
     init {
-        persistenceConsumerJob = persistenceScope.launch {
+        persistenceConsumerJob = activePersistenceScope.launch {
             for (snapshot in persistQueue) {
                 try {
                     persistState(snapshot)
@@ -74,22 +76,22 @@ class WorkshopViewModel(
 
     fun abortGeneration() {
         if (activeGenerationId == 0) return
-        val generationId = activeGenerationId
-        cleanupStreamingAssistant(
-            generationId = generationId,
-            assistantMessageId = activeAssistantMessageId,
-            errorMessage = null,
-        )
+        activeAssistantMessageId?.let { assistantMessageId ->
+            applyAssistantStreamEvent(
+                event = WorkshopAssistantStreamEvent.AbortAck(messageId = assistantMessageId),
+                persistAfter = true,
+            )
+        }
         activeGenerationJob?.cancel(CancellationException("User aborted generation"))
     }
 
     fun clear() {
-        scope.cancel()
+        activeScope.cancel()
         persistQueue.close()
         runBlocking {
             persistenceConsumerJob.join()
         }
-        persistenceScope.cancel()
+        activePersistenceScope.cancel()
     }
 
     private fun startGeneration(
@@ -110,25 +112,15 @@ class WorkshopViewModel(
                 chatInputText = "",
                 errorMessage = persistenceErrorMessage,
                 streamingStatus = WorkshopStreamingStatus.Streaming,
-                messages = current.messages + listOf(
-                    WorkshopChatMessage.user(
-                        id = userMessageId,
-                        text = userFacingPrompt,
-                    ),
-                    WorkshopChatMessage.assistant(
-                        id = assistantMessageId,
-                        assistant = WorkshopAssistantTurn(
-                            renderedMarkdown = "",
-                            phase = WorkshopAssistantPhase.Streaming,
-                        ),
-                        isStreaming = true,
-                    ),
+                messages = current.messages + WorkshopChatMessage.user(
+                    id = userMessageId,
+                    text = userFacingPrompt,
                 ),
             )
         }
         persistCurrentState()
 
-        val generationJob = scope.launch(start = CoroutineStart.LAZY) {
+        val generationJob = activeScope.launch(start = CoroutineStart.LAZY) {
             try {
                 streamSource.stream(
                     request = GenerationRequest(
@@ -151,11 +143,15 @@ class WorkshopViewModel(
                     return@launch
                 }
                 if (activeGenerationId == generationId) {
-                    cleanupStreamingAssistant(
-                        generationId = generationId,
-                        assistantMessageId = activeAssistantMessageId,
-                        errorMessage = throwable.message ?: "Generation failed.",
-                    )
+                    activeAssistantMessageId?.let { assistantMessageId ->
+                        applyAssistantStreamEvent(
+                            event = WorkshopAssistantStreamEvent.Error(
+                                messageId = assistantMessageId,
+                                message = throwable.message ?: "Generation failed.",
+                            ),
+                            persistAfter = true,
+                        )
+                    }
                 }
             } finally {
                 activeGenerationJob = null
@@ -199,182 +195,56 @@ class WorkshopViewModel(
         generationId: Int,
         event: WorkshopAssistantStreamEvent,
     ) {
+        if (activeGenerationId != generationId) return
+
         when (event) {
-            is WorkshopAssistantStreamEvent.Start -> ensureStreamingAssistant(event.messageId)
-            is WorkshopAssistantStreamEvent.MarkdownDelta -> appendAssistantToken(
-                assistantMessageId = event.messageId,
-                token = event.markdown,
-            )
-            is WorkshopAssistantStreamEvent.ChoicesReplace -> updateAssistantChoices(
-                assistantMessageId = event.messageId,
-                choices = event.choices,
-            )
-            is WorkshopAssistantStreamEvent.MetadataPatch -> updateAssistantMetadata(
-                assistantMessageId = event.messageId,
-                title = event.title,
-                badge = event.badge,
-            )
-            is WorkshopAssistantStreamEvent.Complete -> finalizeAssistantTurn(
-                generationId = generationId,
-                assistantMessageId = event.messageId,
-                finalMarkdown = event.finalMarkdown,
-            )
-            is WorkshopAssistantStreamEvent.AbortAck -> cleanupStreamingAssistant(
-                generationId = generationId,
-                assistantMessageId = event.messageId,
-                errorMessage = null,
-            )
-            is WorkshopAssistantStreamEvent.Error -> cleanupStreamingAssistant(
-                generationId = generationId,
-                assistantMessageId = event.messageId,
-                errorMessage = event.message,
+            is WorkshopAssistantStreamEvent.Start -> {
+                if (event.messageId != activeAssistantMessageId) return
+                applyAssistantStreamEvent(event)
+            }
+
+            is WorkshopAssistantStreamEvent.MarkdownDelta,
+            is WorkshopAssistantStreamEvent.ChoicesReplace,
+            is WorkshopAssistantStreamEvent.MetadataPatch -> applyAssistantStreamEvent(event)
+
+            is WorkshopAssistantStreamEvent.Complete,
+            is WorkshopAssistantStreamEvent.AbortAck,
+            is WorkshopAssistantStreamEvent.Error -> applyAssistantStreamEvent(
+                event = event,
+                persistAfter = true,
             )
         }
     }
 
-    private fun ensureStreamingAssistant(messageId: String) {
-        if (activeAssistantMessageId != messageId) return
-        if (_state.value.messages.any { message -> message.id == messageId }) return
-
-        _state.update {
-            it.copy(
-                messages = it.messages + WorkshopChatMessage.assistant(
-                    id = messageId,
-                    assistant = WorkshopAssistantTurn(
-                        renderedMarkdown = "",
-                        phase = WorkshopAssistantPhase.Streaming,
-                    ),
-                    isStreaming = true,
-                ),
-            )
-        }
-    }
-
-    private fun appendAssistantToken(
-        assistantMessageId: String,
-        token: String,
+    private fun applyAssistantStreamEvent(
+        event: WorkshopAssistantStreamEvent,
+        persistAfter: Boolean = false,
     ) {
-        if (activeAssistantMessageId != assistantMessageId) return
-        _state.update {
-            it.copy(
-                messages = it.messages.map { message ->
-                    if (message.id == assistantMessageId && message.isStreaming) {
-                        val assistant = message.assistant ?: return@map message
-                        message.withAssistant(
-                            assistant.copy(
-                                renderedMarkdown = assistant.renderedMarkdown + token,
-                                phase = WorkshopAssistantPhase.Streaming,
-                                failureMessage = null,
-                            )
-                        )
-                    } else {
-                        message
-                    }
-                },
-            )
+        var changed = false
+        _state.update { current ->
+            val reduced = WorkshopAssistantStreamReducer.apply(current, event)
+            if (reduced == current) {
+                current
+            } else {
+                changed = true
+                when (event) {
+                    is WorkshopAssistantStreamEvent.Start -> reduced.copy(
+                        errorMessage = persistenceErrorMessage,
+                    )
+
+                    is WorkshopAssistantStreamEvent.Complete,
+                    is WorkshopAssistantStreamEvent.AbortAck,
+                    is WorkshopAssistantStreamEvent.Error -> reduced.copy(
+                        streamingStatus = WorkshopStreamingStatus.Recovering,
+                    )
+
+                    else -> reduced
+                }
+            }
         }
-    }
-
-    private fun updateAssistantChoices(
-        assistantMessageId: String,
-        choices: List<WorkshopChoice>,
-    ) {
-        if (activeAssistantMessageId != assistantMessageId) return
-        _state.update {
-            it.copy(
-                messages = it.messages.map { message ->
-                    if (message.id == assistantMessageId && message.isStreaming) {
-                        val assistant = message.assistant ?: return@map message
-                        message.withAssistant(
-                            assistant.copy(
-                                choices = choices,
-                            )
-                        )
-                    } else {
-                        message
-                    }
-                },
-            )
+        if (persistAfter && changed) {
+            persistCurrentState()
         }
-    }
-
-    private fun updateAssistantMetadata(
-        assistantMessageId: String,
-        title: String?,
-        badge: String?,
-    ) {
-        if (activeAssistantMessageId != assistantMessageId) return
-        _state.update {
-            it.copy(
-                messages = it.messages.map { message ->
-                    if (message.id == assistantMessageId && message.isStreaming) {
-                        val assistant = message.assistant ?: return@map message
-                        message.withAssistant(
-                            assistant.copy(
-                                metadata = assistant.metadata.copy(
-                                    title = title ?: assistant.metadata.title,
-                                    badge = badge ?: assistant.metadata.badge,
-                                ),
-                            )
-                        )
-                    } else {
-                        message
-                    }
-                },
-            )
-        }
-    }
-
-    private fun finalizeAssistantTurn(
-        generationId: Int,
-        assistantMessageId: String,
-        finalMarkdown: String?,
-    ) {
-        if (activeGenerationId != generationId) return
-        if (activeAssistantMessageId != assistantMessageId) return
-        if (!_state.value.isStreamingAssistant(assistantMessageId)) return
-
-        _state.update {
-            it.copy(
-                messages = it.messages.map { message ->
-                    if (message.id == assistantMessageId) {
-                        val assistant = message.assistant ?: return@map message
-                        message.withAssistant(
-                            assistant.copy(
-                                renderedMarkdown = finalMarkdown ?: assistant.renderedMarkdown,
-                                phase = WorkshopAssistantPhase.Completed,
-                                failureMessage = null,
-                            )
-                        )
-                    } else {
-                        message
-                    }
-                },
-                streamingStatus = WorkshopStreamingStatus.Recovering,
-            )
-        }
-        persistCurrentState()
-    }
-
-    private fun cleanupStreamingAssistant(
-        generationId: Int,
-        assistantMessageId: String?,
-        errorMessage: String?,
-    ) {
-        if (activeGenerationId != generationId) return
-        if (activeAssistantMessageId != assistantMessageId) return
-        if (errorMessage != null && !_state.value.isStreamingAssistant(assistantMessageId)) return
-
-        _state.update {
-            it.copy(
-                messages = it.messages.filterNot { message ->
-                    message.id == assistantMessageId && message.isStreaming
-                },
-                streamingStatus = WorkshopStreamingStatus.Recovering,
-                errorMessage = errorMessage ?: persistenceErrorMessage,
-            )
-        }
-        persistCurrentState()
     }
 }
 
@@ -391,20 +261,3 @@ private fun String.generationIdOrNull(): Int? {
 }
 
 private val GenerationMessageIdPattern = Regex("""generation-(\d+)-(?:user|assistant)""")
-
-private fun WorkshopChatMessage.withAssistant(assistant: WorkshopAssistantTurn): WorkshopChatMessage =
-    copy(
-        text = assistant.renderedMarkdown,
-        assistant = assistant,
-        isStreaming = assistant.phase == WorkshopAssistantPhase.Streaming,
-    )
-
-private fun WorkshopUiState.isStreamingAssistant(messageId: String?): Boolean {
-    if (messageId == null) return false
-    return messages.any { message ->
-        message.id == messageId &&
-            message.role == WorkshopMessageRole.Assistant &&
-            message.assistant?.phase == WorkshopAssistantPhase.Streaming &&
-            message.isStreaming
-    }
-}

@@ -268,14 +268,10 @@ class WorkshopViewModelTest {
         viewModel.sendChatMessage()
         runCurrent()
 
-        assertEquals(2, viewModel.state.value.messages.size)
         assertEquals(
-            listOf("generation-1-user", "generation-1-assistant"),
+            listOf("generation-1-user"),
             viewModel.state.value.messages.map { it.id },
         )
-        val assistant = viewModel.state.value.messages.last().assistant!!
-        assertEquals("right", assistant.renderedMarkdown)
-        assertEquals(WorkshopAssistantPhase.Completed, assistant.phase)
         assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
         assertNull(viewModel.state.value.errorMessage)
     }

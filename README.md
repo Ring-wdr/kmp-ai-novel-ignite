@@ -44,7 +44,7 @@ Kotlin Multiplatform 기반의 AI 소설 작성 앱 프로젝트입니다.
 
 ## Workshop Typed Stream Prototype
 
-Desktop에서 typed stream fixture 경로를 수동 검증하려면 `NOVEL_IGNITE_WORKSHOP_STREAM_MODE=fixture`를 설정한 뒤 `./gradlew.bat :composeApp:run`을 실행하세요.
+Desktop에서 typed stream fixture 경로를 수동 검증하려면 PowerShell에서 `$env:NOVEL_IGNITE_WORKSHOP_STREAM_MODE="fixture"`를 설정한 뒤 `./gradlew.bat :composeApp:run`을 실행하세요.
 
 1. `Workshop` 화면을 연 다음 `Continue scene`을 눌러 fixture assistant turn이 진행되는지 확인합니다.
 2. 최신 assistant turn 아래에 markdown이 점진적으로 표시되고 follow-up choice 버튼이 나타나는지 확인합니다.
