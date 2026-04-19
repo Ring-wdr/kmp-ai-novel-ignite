@@ -146,8 +146,26 @@ class FixtureWorkshopAssistantStreamSource(
     }
 }
 
+internal fun createWorkshopAssistantStreamSource(
+    inferenceEngine: InferenceEngine,
+): WorkshopAssistantStreamSource =
+    when (workshopStreamMode()) {
+        "fixture" -> FixtureWorkshopAssistantStreamSource()
+        else -> DefaultWorkshopAssistantStreamSource(
+            inferenceEngine = inferenceEngine,
+            choiceBuilder = WorkshopChoiceBuilder(),
+        )
+    }
+
 internal fun workshopGenerationRequestId(generationId: Int): String = "request-$generationId"
 
 internal fun workshopGenerationUserMessageId(generationId: Int): String = "generation-$generationId-user"
 
 internal fun workshopGenerationAssistantMessageId(generationId: Int): String = "generation-$generationId-assistant"
+
+private fun workshopStreamMode(): String? =
+    runCatching {
+        System.getProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE")
+            ?.trim()
+            ?.lowercase()
+    }.getOrNull()

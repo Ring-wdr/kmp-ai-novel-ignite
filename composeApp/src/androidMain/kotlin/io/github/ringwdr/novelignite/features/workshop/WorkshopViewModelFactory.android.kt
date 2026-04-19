@@ -4,8 +4,5 @@ import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
 
 actual fun createDefaultWorkshopViewModel(inferenceEngine: InferenceEngine): WorkshopViewModel =
     WorkshopViewModel(
-        streamSource = DefaultWorkshopAssistantStreamSource(
-            inferenceEngine = inferenceEngine,
-            choiceBuilder = WorkshopChoiceBuilder(),
-        ),
+        streamSource = createWorkshopAssistantStreamSource(inferenceEngine),
     )

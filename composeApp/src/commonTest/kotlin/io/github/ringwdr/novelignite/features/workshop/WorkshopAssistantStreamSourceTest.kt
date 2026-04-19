@@ -5,9 +5,11 @@ import io.github.ringwdr.novelignite.domain.inference.GenerationRequest
 import io.github.ringwdr.novelignite.domain.inference.InferenceEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 
@@ -80,5 +82,27 @@ class WorkshopAssistantStreamSourceTest {
         assertEquals(3, choices.size)
         assertTrue(choices.first().prompt.contains("Fixture turn"))
         assertTrue(events.last() is WorkshopAssistantStreamEvent.Complete)
+    }
+
+    @Test
+    fun selector_usesFixtureModeWhenRequested() = runTest {
+        val original = System.getProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE")
+        try {
+            System.setProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE", "fixture")
+
+            val source = createWorkshopAssistantStreamSource(
+                inferenceEngine = object : InferenceEngine {
+                    override fun streamGenerate(request: GenerationRequest): Flow<GenerationEvent> = flowOf()
+                },
+            )
+
+            assertIs<FixtureWorkshopAssistantStreamSource>(source)
+        } finally {
+            if (original == null) {
+                System.clearProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE")
+            } else {
+                System.setProperty("NOVEL_IGNITE_WORKSHOP_STREAM_MODE", original)
+            }
+        }
     }
 }
