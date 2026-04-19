@@ -3,6 +3,9 @@ package io.github.ringwdr.novelignite.features.templates
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -56,6 +59,8 @@ fun TemplatesScreen(
     var isEnriching by remember { mutableStateOf(false) }
     var remixSourceVersion by remember { mutableStateOf<TemplateVersion?>(null) }
     var selectedTemplateVersions by remember { mutableStateOf<List<TemplateVersion>>(emptyList()) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
 
     val selectedTemplate = screenState.editingTemplateId?.let { templateId ->
         templates.firstOrNull { it.id == templateId }
@@ -83,10 +88,18 @@ fun TemplatesScreen(
         screenState = screenState.openEdit(template.id)
     }
 
-    fun returnToList() {
+    fun forceReturnToList() {
         editorViewModel.reset()
         clearTransientEditorState()
         screenState = screenState.returnToList()
+    }
+
+    fun requestReturnToList() {
+        if (editorViewModel.hasUnsavedChanges()) {
+            showDiscardDialog = true
+        } else {
+            forceReturnToList()
+        }
     }
 
     LaunchedEffect(selectedTemplateVersionKey) {
@@ -138,9 +151,9 @@ fun TemplatesScreen(
                     versions = selectedTemplateVersions,
                     isEnriching = isEnriching,
                     enrichErrorMessage = enrichError,
-                    showDeleteAction = false,
-                    onBack = ::returnToList,
-                    onDelete = {},
+                    showDeleteAction = !showDeleteDialog,
+                    onBack = ::requestReturnToList,
+                    onDelete = { showDeleteDialog = true },
                     onTitleChange = editorViewModel::updateTitle,
                     onGenreChange = editorViewModel::updateGenre,
                     onPremiseChange = editorViewModel::updatePremise,
@@ -203,6 +216,66 @@ fun TemplatesScreen(
                     },
                 )
             }
+        }
+
+        if (showDeleteDialog && selectedTemplate != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Delete template?") },
+                text = {
+                    Text(
+                        "'${selectedTemplate.title}' will be removed. If it is active in Workshop, that selection will also be cleared."
+                    )
+                },
+                confirmButton = {
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                deleteTemplate(selectedTemplate.id)
+                                templates = loadTemplates()
+                                if (activeTemplate?.id == selectedTemplate.id) {
+                                    ActiveWorkshopTemplateStore.clear()
+                                }
+                                showDeleteDialog = false
+                                forceReturnToList()
+                                screenState = screenState.onDeleteSuccess("Template deleted")
+                            }
+                        },
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { showDeleteDialog = false }) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
+
+        if (showDiscardDialog) {
+            AlertDialog(
+                onDismissRequest = { showDiscardDialog = false },
+                title = { Text("Discard changes?") },
+                text = {
+                    Text("Your draft edits are not saved yet.")
+                },
+                confirmButton = {
+                    OutlinedButton(
+                        onClick = {
+                            showDiscardDialog = false
+                            forceReturnToList()
+                        },
+                    ) {
+                        Text("Discard changes")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { showDiscardDialog = false }) {
+                        Text("Keep editing")
+                    }
+                },
+            )
         }
     }
 }

@@ -54,7 +54,7 @@ internal fun TemplateEditorPane(
             ) {
                 Text("Back to Templates")
             }
-            if (showDeleteAction) {
+            if (mode == TemplateEditorMode.Edit && showDeleteAction) {
                 OutlinedButton(
                     onClick = onDelete,
                     modifier = Modifier.testTag(TEMPLATE_DELETE_BUTTON_TAG),
