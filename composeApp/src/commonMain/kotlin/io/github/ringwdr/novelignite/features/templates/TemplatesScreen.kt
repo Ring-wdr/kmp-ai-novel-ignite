@@ -2,10 +2,12 @@ package io.github.ringwdr.novelignite.features.templates
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +31,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun TemplatesScreen() {
     var templates by remember { mutableStateOf(loadLocalTemplates()) }
+    var screenState by remember { mutableStateOf(TemplatesScreenState()) }
     val activeTemplate by ActiveWorkshopTemplateStore.selection.collectAsState()
     val newTemplateEditorViewModel = remember { TemplateEditorViewModel() }
     val newTemplateEditorState by newTemplateEditorViewModel.state.collectAsState()
@@ -64,6 +67,7 @@ fun TemplatesScreen() {
     LaunchedEffect(remixSelection) {
         val selection = remixSelection ?: return@LaunchedEffect
         newTemplateEditorViewModel.loadDraft(selection.draft)
+        screenState = screenState.openCreate().copy(highlightedTemplateId = null)
         newPromptBlockInput = TextFieldValue("")
         newPromptBlockError = null
         newEnrichError = null
@@ -124,6 +128,10 @@ fun TemplatesScreen() {
                     )
                     templates = loadLocalTemplates()
                     remixSourceVersion = null
+                    screenState = screenState.onSaveSuccess(
+                        savedTemplateId = savedTemplate.id,
+                        message = "Template saved",
+                    )
                     ActiveWorkshopTemplateStore.select(
                         ActiveWorkshopTemplate(
                             id = savedTemplate.id,
@@ -190,6 +198,10 @@ fun TemplatesScreen() {
                         )
                         templates = loadLocalTemplates()
                         selectedTemplateId = savedTemplate.id
+                        screenState = screenState.onSaveSuccess(
+                            savedTemplateId = savedTemplate.id,
+                            message = "Template saved",
+                        )
                         detailTemplateEditorViewModel.loadTemplate(savedTemplate)
                         detailPromptBlockInput = TextFieldValue("")
                         detailPromptBlockError = null
@@ -239,6 +251,27 @@ fun TemplatesScreen() {
                             Text("v${version.versionNumber} · ${version.title}")
                         }
                     }
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                val templateId = selectedTemplateId ?: return@launch
+                                deleteLocalTemplate(templateId)
+                                templates = loadLocalTemplates()
+                                if (activeTemplate?.id == templateId) {
+                                    ActiveWorkshopTemplateStore.clear()
+                                }
+                                selectedTemplateId = null
+                                selectedTemplateVersions = emptyList()
+                                detailTemplateEditorViewModel.reset()
+                                detailPromptBlockInput = TextFieldValue("")
+                                detailPromptBlockError = null
+                                detailEnrichError = null
+                                screenState = screenState.onDeleteSuccess("Template deleted")
+                            }
+                        },
+                    ) {
+                        Text("Delete Template")
+                    }
                 }
             }
         }
@@ -246,14 +279,35 @@ fun TemplatesScreen() {
         TemplatesListPane(
             templates = templates,
             activeTemplate = activeTemplate,
-            highlightedTemplateId = null,
-            feedbackMessage = null,
-            onCreateTemplate = {},
+            highlightedTemplateId = screenState.highlightedTemplateId,
+            feedbackMessage = screenState.feedbackMessage,
+            onCreateTemplate = {
+                screenState = screenState.openCreate().copy(highlightedTemplateId = null)
+                selectedTemplateId = null
+                selectedTemplateVersions = emptyList()
+                remixBanner = null
+                remixSourceVersion = null
+                newTemplateEditorViewModel.reset()
+                newPromptBlockInput = TextFieldValue("")
+                newPromptBlockError = null
+                newEnrichError = null
+                detailTemplateEditorViewModel.reset()
+                detailPromptBlockInput = TextFieldValue("")
+                detailPromptBlockError = null
+                detailEnrichError = null
+                TemplateRemixStore.clear()
+            },
             onOpenTemplate = { template ->
+                screenState = screenState.returnToList().copy(
+                    highlightedTemplateId = null,
+                    feedbackMessage = null,
+                )
                 selectedTemplateId = template.id
                 detailTemplateEditorViewModel.loadTemplate(template)
                 detailPromptBlockInput = TextFieldValue("")
                 detailPromptBlockError = null
+                detailEnrichError = null
+                selectedTemplateVersions = emptyList()
             },
             onUseInWorkshop = { template ->
                 ActiveWorkshopTemplateStore.select(
