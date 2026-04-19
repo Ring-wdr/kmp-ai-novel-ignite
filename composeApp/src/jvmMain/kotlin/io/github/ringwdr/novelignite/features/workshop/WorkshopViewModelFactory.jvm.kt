@@ -108,42 +108,46 @@ private fun buildStoredContent(state: WorkshopUiState): String =
 private fun parseStoredState(content: String): WorkshopUiState =
     runCatching { workshopStateJson.decodeFromString<WorkshopStateSnapshot>(content).toUiState() }
         .recoverCatching {
-            parseFlexibleSnapshotState(content)
+            parseFlexibleSnapshot(content)?.toUiState()
                 ?: workshopStateJson.decodeFromString<LegacyStoredWorkshopState>(content).toUiState()
         }
         .getOrElse { WorkshopUiState(draftText = content) }
 
-private fun parseFlexibleSnapshotState(content: String): WorkshopUiState? {
+private fun parseFlexibleSnapshot(content: String): WorkshopStateSnapshot? {
     val element = runCatching { workshopStateJson.parseToJsonElement(content) }.getOrNull() ?: return null
     val objectElement = element as? JsonObject ?: return null
     if ("messages" !in objectElement) return null
 
-    return WorkshopUiState(
+    return WorkshopStateSnapshot(
         draftText = objectElement["draftText"].stringValueOrEmpty(),
-        messages = objectElement["messages"].toWorkshopMessages(),
-        streamingStatus = WorkshopStreamingStatus.Idle,
-        errorMessage = null,
+        messages = objectElement["messages"].toPersistedMessages(),
     )
 }
 
 private fun JsonElement?.stringValueOrEmpty(): String =
     (this as? JsonPrimitive)?.contentOrNull.orEmpty()
 
-private fun JsonElement?.toWorkshopMessages(): List<WorkshopChatMessage> =
+private fun JsonElement?.toPersistedMessages(): List<WorkshopPersistedMessage> =
     (this as? JsonArray)
-        ?.mapNotNull { element -> element.toWorkshopMessageOrNull() }
+        ?.mapNotNull { element -> element.toPersistedMessageOrNull() }
         .orEmpty()
 
-private fun JsonElement.toWorkshopMessageOrNull(): WorkshopChatMessage? {
+private fun JsonElement.toPersistedMessageOrNull(): WorkshopPersistedMessage? {
     val objectElement = this as? JsonObject ?: return null
     val id = objectElement["id"].stringValueOrEmpty().takeIf { it.isNotBlank() } ?: return null
     val role = objectElement["role"].stringValueOrEmpty().toWorkshopMessageRoleOrNull() ?: return null
     val text = objectElement["text"].stringValueOrEmpty()
 
     return when (role) {
-        WorkshopMessageRole.User -> WorkshopChatMessage.user(id = id, text = text)
-        WorkshopMessageRole.Assistant -> WorkshopChatMessage.assistant(
+        WorkshopMessageRole.User -> WorkshopPersistedMessage(
             id = id,
+            role = role,
+            text = text,
+        )
+        WorkshopMessageRole.Assistant -> WorkshopPersistedMessage(
+            id = id,
+            role = role,
+            text = text,
             assistant = objectElement["assistant"].toWorkshopAssistantOrNull(text)
                 ?: WorkshopAssistantTurn(
                     renderedMarkdown = text,

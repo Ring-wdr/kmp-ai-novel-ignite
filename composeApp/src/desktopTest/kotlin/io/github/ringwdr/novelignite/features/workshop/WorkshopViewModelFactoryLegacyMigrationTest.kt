@@ -55,6 +55,11 @@ class WorkshopViewModelFactoryLegacyMigrationTest {
                     "phase": "Paused",
                     "failureMessage": null
                   }
+                },
+                {
+                  "id": "a-1",
+                  "role": "Assistant",
+                  "text": "Second recovered text"
                 }
               ],
               "ignoredSnapshotField": true
@@ -83,6 +88,13 @@ class WorkshopViewModelFactoryLegacyMigrationTest {
                             title = "Recovered summary",
                             badge = "Completed",
                         ),
+                        phase = WorkshopAssistantPhase.Completed,
+                    ),
+                ),
+                WorkshopChatMessage.assistant(
+                    id = "restored-message-3-assistant",
+                    assistant = WorkshopAssistantTurn(
+                        renderedMarkdown = "Second recovered text",
                         phase = WorkshopAssistantPhase.Completed,
                     ),
                 ),
