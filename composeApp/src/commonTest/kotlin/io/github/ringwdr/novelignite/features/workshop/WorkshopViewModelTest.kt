@@ -185,6 +185,34 @@ class WorkshopViewModelTest {
     }
 
     @Test
+    fun sendChatMessage_ignoresWrongStartMessageIds() = runTest {
+        val viewModel = newViewModel(
+            testScheduler = testScheduler,
+            streamSource = source { _, generationId ->
+                val messageId = workshopGenerationAssistantMessageId(generationId)
+                emit(WorkshopAssistantStreamEvent.Start(workshopGenerationRequestId(generationId), "generation-999-assistant"))
+                emit(WorkshopAssistantStreamEvent.MarkdownDelta(messageId, "right"))
+                emit(WorkshopAssistantStreamEvent.Complete(messageId))
+            },
+        )
+
+        viewModel.updateChatInput("Continue the scene")
+        viewModel.sendChatMessage()
+        runCurrent()
+
+        assertEquals(2, viewModel.state.value.messages.size)
+        assertEquals(
+            listOf("generation-1-user", "generation-1-assistant"),
+            viewModel.state.value.messages.map { it.id },
+        )
+        val assistant = viewModel.state.value.messages.last().assistant!!
+        assertEquals("right", assistant.renderedMarkdown)
+        assertEquals(WorkshopAssistantPhase.Completed, assistant.phase)
+        assertEquals(WorkshopStreamingStatus.Idle, viewModel.state.value.streamingStatus)
+        assertNull(viewModel.state.value.errorMessage)
+    }
+
+    @Test
     fun abortGeneration_entersRecoveringUntilCollectorFinishes_thenAllowsRetry() = runTest {
         val release = Channel<Unit>()
         val requests = mutableListOf<GenerationRequest>()

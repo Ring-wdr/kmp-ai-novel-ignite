@@ -191,6 +191,7 @@ class WorkshopViewModel(
     }
 
     private fun ensureStreamingAssistant(messageId: String) {
+        if (activeAssistantMessageId != messageId) return
         if (_state.value.messages.any { message -> message.id == messageId }) return
 
         _state.update {
